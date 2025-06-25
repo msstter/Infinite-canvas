@@ -19,9 +19,17 @@ canvasElement.addEventListener('wheel', (e) => {
   const mouseY = e.clientY;
 
   const worldPos = canvas.screenToWorld(mouseX, mouseY);
-  canvas.scale *= zoomFactor;
-  canvas.offsetX = mouseX - worldPos.x * canvas.scale;
-  canvas.offsetY = mouseY - worldPos.y * canvas.scale;
+
+  // TEMPORARY zoom calculation
+  let newScale = canvas.scale * zoomFactor;
+
+  // ✅ Clamp the zoom scale to a safe range
+  newScale = Math.max(0.01, Math.min(newScale, 100)); // Adjust limits as needed
+
+  // ✅ Adjust offset so we zoom centered around the cursor
+  canvas.offsetX = mouseX - worldPos.x * newScale;
+  canvas.offsetY = mouseY - worldPos.y * newScale;
+  canvas.scale = newScale;
 
   redraw();
 }, { passive: false });
