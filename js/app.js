@@ -7,7 +7,7 @@ const canvas = new Canvas(canvasElement);
 const elements = new ElementsManager();
 
 function redraw() {
-  canvas.draw(elements.getItems());
+  canvas.draw(elements.getItems(), elements.getSelected());
 }
 
 setupUI(canvas, elements, redraw);
