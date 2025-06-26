@@ -16,14 +16,16 @@ export class Canvas {
     this.resize();
   }
 
-  // Methods to control line drawing
-  startDrawing(x, y) {
+  // MODIFIED: This method now accepts an 'options' object with color, size, and mode
+  startDrawing(x, y, options) {
     this.isDrawing = true;
     this.currentPath = {
       type: 'path',
       points: [this.screenToWorld(x, y)],
-      color: 'black',
-      lineWidth: 2
+      // Use the values from the options object passed by ui.js
+      color: options.color,
+      lineWidth: options.lineWidth,
+      mode: options.mode
     };
   }
 
@@ -36,7 +38,11 @@ export class Canvas {
     this.isDrawing = false;
     const finishedPath = this.currentPath;
     this.currentPath = null;
-    return finishedPath;
+    // Only return a path if it has more than one point (i.e., not just a click)
+    if (finishedPath && finishedPath.points.length > 1) {
+        return finishedPath;
+    }
+    return null;
   }
 
   resize() {
@@ -116,8 +122,14 @@ export class Canvas {
       } else if (item.type === 'image') {
         ctx.drawImage(item.img, item.x, item.y, item.width, item.height);
       } else if (item.type === 'path' && item.points.length > 1) {
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2 / this.scale;
+        
+        // MODIFIED: Checks for eraser mode and uses item-specific properties
+        if (item.mode === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+        }
+
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth = item.lineWidth / this.scale;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
@@ -128,7 +140,6 @@ export class Canvas {
         }
         ctx.stroke();
       }
-
 
       if (item === selectedItem) {
         ctx.strokeStyle = 'red';
@@ -176,6 +187,5 @@ export class Canvas {
     }
 
     ctx.restore();
-  } // This is the closing brace for the draw method
-
-} // This is the final closing brace for the Canvas class
+  }
+}
