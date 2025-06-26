@@ -88,34 +88,48 @@ export class Canvas {
         ctx.drawImage(item.img, item.x, item.y, item.width, item.height);
       }
 
-      // Draw selection box if selected
       if (item === selectedItem) {
         ctx.strokeStyle = 'red';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 / this.scale;
+        const handleSize = 10 / this.scale;
 
+        let width, height, top, left;
         if (item.type === 'text') {
-          const width = item.text.length * item.fontSize * 0.6;
-          const height = item.fontSize;
-          ctx.strokeRect(item.x - 2, item.y - height - 2, width + 4, height + 4);
+          width = item.text.length * item.fontSize * 0.6;
+          height = item.fontSize;
+          top = item.y - height;
+          left = item.x;
         } else if (item.type === 'image') {
-          ctx.strokeRect(item.x - 2, item.y - 2, item.width + 4, item.height + 4);
+          width = item.width;
+          height = item.height;
+          top = item.y;
+          left = item.x;
+        }
+
+        // Draw red box
+        ctx.strokeRect(left - 2, top - 2, width + 4, height + 4);
+
+        // Draw handles and store their hitboxes
+        const corners = [
+          { name: 'tl', x: left, y: top },
+          { name: 'tr', x: left + width, y: top },
+          { name: 'bl', x: left, y: top + height },
+          { name: 'br', x: left + width, y: top + height },
+        ];
+
+        item._resizeHandles = [];
+        for (const corner of corners) {
+          ctx.fillStyle = 'red';
+          ctx.fillRect(corner.x - handleSize / 2, corner.y - handleSize / 2, handleSize, handleSize);
+          item._resizeHandles.push({
+            name: corner.name,
+            x: corner.x - handleSize / 2,
+            y: corner.y - handleSize / 2,
+            size: handleSize,
+          });
         }
       }
 
-      if (item === this.selectedItem) {
-      // ... (existing selection box code)
-        const handleSize = 10 / this.scale;
-        const hx = (item.x + (item.width || item.text.length * item.fontSize * 0.6));
-        const hy = (item.y + (item.height || 0));
-        ctx.fillStyle = 'red';
-        ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
-
-        item._resizeHandle = {
-          x: hx - handleSize / 2,
-          y: hy - handleSize / 2,
-          size: handleSize,
-        };
-    }
 
       ctx.restore();
     }

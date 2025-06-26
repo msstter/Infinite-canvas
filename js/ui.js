@@ -11,6 +11,7 @@ export function setupUI(canvas, elements, drawCallback) {
   let draggingElement = null;
   let resizingElement = null;
   let resizingStart = null;
+  let resizingHandle = null;
   let offsetX = 0;
   let offsetY = 0;
 
@@ -18,16 +19,18 @@ export function setupUI(canvas, elements, drawCallback) {
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
     const selected = elements.getSelected();
 
-    // Check if clicking on resize handle
-    if (selected && selected._resizeHandle) {
-      const handle = selected._resizeHandle;
-      if (
-        pos.x >= handle.x && pos.x <= handle.x + handle.size &&
-        pos.y >= handle.y && pos.y <= handle.y + handle.size
-      ) {
-        resizingElement = selected;
-        resizingStart = { x: pos.x, y: pos.y };
-        return;
+    // Check if clicking on any resize handle
+    if (selected && selected._resizeHandles) {
+      for (const handle of selected._resizeHandles) {
+        if (
+          pos.x >= handle.x && pos.x <= handle.x + handle.size &&
+          pos.y >= handle.y && pos.y <= handle.y + handle.size
+        ) {
+          resizingElement = selected;
+          resizingStart = { x: pos.x, y: pos.y };
+          resizingHandle = handle.name;
+          return;
+        }
       }
     }
 
@@ -51,18 +54,35 @@ export function setupUI(canvas, elements, drawCallback) {
   canvas.canvas.addEventListener('mousemove', (e) => {
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
 
-    if (resizingElement) {
-      const dx = pos.x - resizingElement.x;
-      const dy = pos.y - resizingElement.y;
+    if (resizingElement && resizingHandle) {
+      const dx = pos.x - resizingStart.x;
+      const dy = pos.y - resizingStart.y;
 
       if (resizingElement.type === 'image') {
-        resizingElement.width = dx;
-        resizingElement.height = dy;
-      } else if (resizingElement.type === 'text') {
-        const newFontSize = Math.max(5, dy); // Avoid font size too small
-        resizingElement.fontSize = newFontSize;
+        if (resizingHandle === 'br' || resizingHandle === 'tr') {
+          resizingElement.width += dx;
+        } else {
+          resizingElement.width -= dx;
+          resizingElement.x += dx;
+        }
+
+        if (resizingHandle === 'br' || resizingHandle === 'bl') {
+          resizingElement.height += dy;
+        } else {
+          resizingElement.height -= dy;
+          resizingElement.y += dy;
+        }
+
+        resizingElement.width = Math.max(10, resizingElement.width);
+        resizingElement.height = Math.max(10, resizingElement.height);
       }
 
+      if (resizingElement.type === 'text') {
+        let newSize = resizingElement.fontSize + (dy * (resizingHandle.includes('t') ? -1 : 1));
+        resizingElement.fontSize = Math.max(5, newSize);
+      }
+
+      resizingStart = { x: pos.x, y: pos.y };
       drawCallback();
       return;
     }
@@ -88,6 +108,7 @@ export function setupUI(canvas, elements, drawCallback) {
     draggingElement = null;
     resizingElement = null;
     resizingStart = null;
+    resizingHandle = null;
 
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
 
