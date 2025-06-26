@@ -1,3 +1,4 @@
+
 export class Canvas {
   constructor(canvasElement) {
     this.canvas = canvasElement;
@@ -106,10 +107,8 @@ export class Canvas {
           left = item.x;
         }
 
-        // Draw red box
-        ctx.strokeRect(left - 2, top - 2, width + 4, height + 4);
+        ctx.strokeRect(left - 2 / this.scale, top - 2 / this.scale, width + 4 / this.scale, height + 4 / this.scale);
 
-        // Draw handles and store their hitboxes
         const corners = [
           { name: 'tl', x: left, y: top },
           { name: 'tr', x: left + width, y: top },
@@ -129,7 +128,6 @@ export class Canvas {
           });
         }
       }
-
 
       ctx.restore();
     }

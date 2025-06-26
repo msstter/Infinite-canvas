@@ -19,7 +19,6 @@ export function setupUI(canvas, elements, drawCallback) {
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
     const selected = elements.getSelected();
 
-    // Check if clicking on any resize handle
     if (selected && selected._resizeHandles) {
       for (const handle of selected._resizeHandles) {
         if (
@@ -73,13 +72,13 @@ export function setupUI(canvas, elements, drawCallback) {
           resizingElement.y += dy;
         }
 
-        resizingElement.width = Math.max(10, resizingElement.width);
-        resizingElement.height = Math.max(10, resizingElement.height);
+        resizingElement.width = resizingElement.width;
+        resizingElement.height = resizingElement.height;
       }
 
       if (resizingElement.type === 'text') {
         let newSize = resizingElement.fontSize + (dy * (resizingHandle.includes('t') ? -1 : 1));
-        resizingElement.fontSize = Math.max(5, newSize);
+        resizingElement.fontSize = newSize;
       }
 
       resizingStart = { x: pos.x, y: pos.y };
