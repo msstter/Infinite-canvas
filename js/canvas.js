@@ -68,6 +68,7 @@ export class Canvas {
   }
 
   draw(items, selectedItem = null) {
+    this.selectedItem = selectedItem;
     this.clear();
     this.drawBackground();
     const ctx = this.ctx;

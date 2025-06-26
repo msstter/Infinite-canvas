@@ -1,3 +1,4 @@
+
 export function setupUI(canvas, elements, drawCallback) {
   const tool = document.getElementById('tool');
   const textInput = document.getElementById('textInput');
@@ -8,14 +9,30 @@ export function setupUI(canvas, elements, drawCallback) {
   let lastX, lastY;
 
   let draggingElement = null;
+  let resizingElement = null;
+  let resizingStart = null;
   let offsetX = 0;
   let offsetY = 0;
 
   canvas.canvas.addEventListener('mousedown', (e) => {
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
-    const hit = elements.getElementAt(pos.x, pos.y);
+    const selected = elements.getSelected();
 
-    if (hit && (hit.type === 'text' || hit.type === 'image')) {
+    // Check if clicking on resize handle
+    if (selected && selected._resizeHandle) {
+      const handle = selected._resizeHandle;
+      if (
+        pos.x >= handle.x && pos.x <= handle.x + handle.size &&
+        pos.y >= handle.y && pos.y <= handle.y + handle.size
+      ) {
+        resizingElement = selected;
+        resizingStart = { x: pos.x, y: pos.y };
+        return;
+      }
+    }
+
+    const hit = elements.getElementAt(pos.x, pos.y);
+    if (hit) {
       elements.selectElement(hit);
       draggingElement = hit;
       offsetX = pos.x - hit.x;
@@ -32,8 +49,25 @@ export function setupUI(canvas, elements, drawCallback) {
   });
 
   canvas.canvas.addEventListener('mousemove', (e) => {
+    const pos = canvas.screenToWorld(e.clientX, e.clientY);
+
+    if (resizingElement) {
+      const dx = pos.x - resizingElement.x;
+      const dy = pos.y - resizingElement.y;
+
+      if (resizingElement.type === 'image') {
+        resizingElement.width = dx;
+        resizingElement.height = dy;
+      } else if (resizingElement.type === 'text') {
+        const newFontSize = Math.max(5, dy); // Avoid font size too small
+        resizingElement.fontSize = newFontSize;
+      }
+
+      drawCallback();
+      return;
+    }
+
     if (draggingElement) {
-      const pos = canvas.screenToWorld(e.clientX, e.clientY);
       draggingElement.x = pos.x - offsetX;
       draggingElement.y = pos.y - offsetY;
       drawCallback();
@@ -51,14 +85,13 @@ export function setupUI(canvas, elements, drawCallback) {
 
   canvas.canvas.addEventListener('mouseup', (e) => {
     isDragging = false;
+    draggingElement = null;
+    resizingElement = null;
+    resizingStart = null;
 
-    if (draggingElement) {
-      draggingElement = null;
-      return;
-    }
+    const pos = canvas.screenToWorld(e.clientX, e.clientY);
 
-    if (!dragged) {
-      const pos = canvas.screenToWorld(e.clientX, e.clientY);
+    if (!dragged && !elements.getSelected()) {
       if (tool.value === 'shape') {
         elements.addShape(pos.x, pos.y, canvas.scale);
         drawCallback();
@@ -80,7 +113,6 @@ export function setupUI(canvas, elements, drawCallback) {
   imageInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const img = new Image();
     img.onload = () => {
       const rect = canvas.canvas.getBoundingClientRect();
