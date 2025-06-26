@@ -1,17 +1,20 @@
 export function setupUI(canvas, elements, drawCallback) {
-  // --- Element References ---
   const tool = document.getElementById('tool');
   const textInput = document.getElementById('textInput');
   const imageInput = document.getElementById('imageInput');
 
-  // New references for the contextual "Draw" menu
   const drawOptionsContainer = document.getElementById('draw-options');
   const drawColorInput = document.getElementById('draw-color');
   const brushSizeInput = document.getElementById('brush-size');
   const brushSizeValue = document.getElementById('brush-size-value');
   const eraserButton = document.getElementById('eraser-tool');
 
-  // --- State Variables ---
+  const drawSettings = {
+    color: '#000000',
+    lineWidth: 2,
+    mode: 'draw'
+  };
+
   let isPanning = false;
   let didPan = false;
   let lastX, lastY;
@@ -22,30 +25,19 @@ export function setupUI(canvas, elements, drawCallback) {
   let resizingHandle = null;
   let offsetX = 0;
   let offsetY = 0;
-  
-  // State object to hold current draw settings
-  const drawSettings = {
-    color: '#000000',
-    lineWidth: 2,
-    mode: 'draw' // Can be 'draw' or 'eraser'
-  };
 
   // --- MOUSE EVENT LISTENERS ---
 
   canvas.canvas.addEventListener('mousedown', (e) => {
-    // If the "Draw" tool is active, start drawing and ignore everything else
     if (tool.value === 'draw') {
-      // Pass the current draw settings to the canvas when starting a path
       canvas.startDrawing(e.clientX, e.clientY, drawSettings);
       drawCallback();
-      return; // Stop further processing for this event
+      return;
     }
 
-    // --- Logic for other tools (Select, Pan, etc.) ---
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
     const selected = elements.getSelected();
 
-    // Check if clicking on a resize handle
     if (selected && selected._resizeHandles) {
       for (const handle of selected._resizeHandles) {
         if (
@@ -60,7 +52,6 @@ export function setupUI(canvas, elements, drawCallback) {
       }
     }
 
-    // Check if clicking on an existing element
     const hit = elements.getElementAt(pos.x, pos.y);
     if (hit) {
       elements.selectElement(hit);
@@ -69,7 +60,6 @@ export function setupUI(canvas, elements, drawCallback) {
       offsetY = pos.y - hit.y;
       drawCallback();
     } else {
-      // If clicking on empty space, start panning
       elements.clearSelection();
       isPanning = true;
       didPan = false;
@@ -80,14 +70,12 @@ export function setupUI(canvas, elements, drawCallback) {
   });
 
   canvas.canvas.addEventListener('mousemove', (e) => {
-    // If we are in the middle of drawing a line, continue it
     if (canvas.isDrawing) {
       canvas.continueDrawing(e.clientX, e.clientY);
       drawCallback();
       return;
     }
 
-    // --- Logic for other tools ---
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
 
     if (resizingElement && resizingHandle) {
@@ -134,15 +122,18 @@ export function setupUI(canvas, elements, drawCallback) {
   });
 
   window.addEventListener('mouseup', (e) => {
-    // If we were drawing, finish the path and add it to our elements
     if (canvas.isDrawing) {
       const newPath = canvas.finishDrawing();
-      elements.addItem(newPath);
+      elements.addItem(newPath); // addItem now saves state automatically
       drawCallback();
       return;
     }
 
-    // --- Logic for other tools ---
+    // MODIFIED: Save state after moving or resizing an element
+    if (draggingElement || resizingElement) {
+        elements.saveState();
+    }
+
     isPanning = false;
     draggingElement = null;
     resizingElement = null;
@@ -151,7 +142,6 @@ export function setupUI(canvas, elements, drawCallback) {
 
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
 
-    // If we clicked on an empty space (no panning), create a new element
     if (!didPan && !elements.getSelected()) {
       if (tool.value === 'shape') {
         elements.addShape(pos.x, pos.y, canvas.scale);
@@ -166,14 +156,12 @@ export function setupUI(canvas, elements, drawCallback) {
     }
   });
 
-  // --- UI CONTROL EVENT LISTENERS ---
+  // --- UI ELEMENT LISTENERS ---
 
   tool.addEventListener('change', () => {
-    // Show/hide legacy inputs
     textInput.style.display = tool.value === 'text' ? 'inline' : 'none';
     imageInput.style.display = tool.value === 'image' ? 'inline' : 'none';
 
-    // Show/hide contextual menus
     document.querySelectorAll('.contextual-menu').forEach(menu => {
         menu.classList.remove('visible');
     });
@@ -181,7 +169,22 @@ export function setupUI(canvas, elements, drawCallback) {
     if (tool.value === 'draw') {
         drawOptionsContainer.classList.add('visible');
     }
-    // Add more 'else if' statements here for 'shape', 'text', etc. in the future
+  });
+
+  drawColorInput.addEventListener('input', (e) => {
+    drawSettings.color = e.target.value;
+    drawSettings.mode = 'draw';
+    eraserButton.style.backgroundColor = '';
+  });
+
+  brushSizeInput.addEventListener('input', (e) => {
+    drawSettings.lineWidth = parseInt(e.target.value, 10);
+    brushSizeValue.textContent = e.target.value;
+  });
+  
+  eraserButton.addEventListener('click', () => {
+      drawSettings.mode = 'eraser';
+      eraserButton.style.backgroundColor = '#a0c4ff';
   });
 
   imageInput.addEventListener('change', (e) => {
@@ -199,20 +202,42 @@ export function setupUI(canvas, elements, drawCallback) {
     img.src = URL.createObjectURL(file);
   });
 
-  // Listeners for the new "Draw" controls
-  drawColorInput.addEventListener('input', (e) => {
-    drawSettings.color = e.target.value;
-    drawSettings.mode = 'draw';
-    eraserButton.style.backgroundColor = ''; // Un-highlight eraser
-  });
+  // --- NEW: GLOBAL KEYBOARD SHORTCUT LISTENER ---
 
-  brushSizeInput.addEventListener('input', (e) => {
-    drawSettings.lineWidth = parseInt(e.target.value, 10);
-    brushSizeValue.textContent = e.target.value;
-  });
-  
-  eraserButton.addEventListener('click', () => {
-      drawSettings.mode = 'eraser';
-      eraserButton.style.backgroundColor = '#a0c4ff'; // Highlight to show it's active
+  window.addEventListener('keydown', (e) => {
+    // Don't trigger shortcuts if user is typing in the text input
+    if (e.target === textInput) return;
+
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey; // Handles Ctrl for Win/Linux, Cmd for Mac
+
+    // Undo (Ctrl+Z or Cmd+Z)
+    if (isCtrlOrCmd && e.key === 'z') {
+      e.preventDefault();
+      elements.undo();
+      drawCallback();
+    }
+
+    // Copy (Ctrl+C or Cmd+C)
+    if (isCtrlOrCmd && e.key === 'c') {
+      e.preventDefault();
+      elements.copySelected();
+      // No redraw needed for copy
+    }
+
+    // Paste (Ctrl+V or Cmd+V)
+    if (isCtrlOrCmd && e.key === 'v') {
+      e.preventDefault();
+      elements.paste();
+      drawCallback();
+    }
+
+    // Delete (Delete or Backspace key)
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      if (elements.deleteSelected()) {
+        elements.saveState();
+        drawCallback();
+      }
+    }
   });
 }
