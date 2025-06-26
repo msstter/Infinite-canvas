@@ -1,4 +1,3 @@
-
 export class Canvas {
   constructor(canvasElement) {
     this.canvas = canvasElement;
@@ -9,8 +8,35 @@ export class Canvas {
     this.resize = this.resize.bind(this);
     this.selectedItem = null;
 
+    // State for continuous line drawing
+    this.isDrawing = false;
+    this.currentPath = null;
+
     window.addEventListener('resize', this.resize);
     this.resize();
+  }
+
+  // Methods to control line drawing
+  startDrawing(x, y) {
+    this.isDrawing = true;
+    this.currentPath = {
+      type: 'path',
+      points: [this.screenToWorld(x, y)],
+      color: 'black',
+      lineWidth: 2
+    };
+  }
+
+  continueDrawing(x, y) {
+    if (!this.isDrawing) return;
+    this.currentPath.points.push(this.screenToWorld(x, y));
+  }
+
+  finishDrawing() {
+    this.isDrawing = false;
+    const finishedPath = this.currentPath;
+    this.currentPath = null;
+    return finishedPath;
   }
 
   resize() {
@@ -76,7 +102,9 @@ export class Canvas {
     ctx.save();
     this.setTransform();
 
-    for (const item of items) {
+    const allItems = this.currentPath ? [...items, this.currentPath] : items;
+
+    for (const item of allItems) {
       ctx.save();
       if (item.type === 'shape') {
         ctx.fillStyle = 'black';
@@ -87,7 +115,20 @@ export class Canvas {
         ctx.fillText(item.text, item.x, item.y);
       } else if (item.type === 'image') {
         ctx.drawImage(item.img, item.x, item.y, item.width, item.height);
+      } else if (item.type === 'path' && item.points.length > 1) {
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2 / this.scale;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(item.points[0].x, item.points[0].y);
+        for (let i = 1; i < item.points.length; i++) {
+          ctx.lineTo(item.points[i].x, item.points[i].y);
+        }
+        ctx.stroke();
       }
+
 
       if (item === selectedItem) {
         ctx.strokeStyle = 'red';
@@ -107,25 +148,27 @@ export class Canvas {
           left = item.x;
         }
 
-        ctx.strokeRect(left - 2 / this.scale, top - 2 / this.scale, width + 4 / this.scale, height + 4 / this.scale);
+        if (width && height) {
+          ctx.strokeRect(left - 2 / this.scale, top - 2 / this.scale, width + 4 / this.scale, height + 4 / this.scale);
 
-        const corners = [
-          { name: 'tl', x: left, y: top },
-          { name: 'tr', x: left + width, y: top },
-          { name: 'bl', x: left, y: top + height },
-          { name: 'br', x: left + width, y: top + height },
-        ];
+          const corners = [
+            { name: 'tl', x: left, y: top },
+            { name: 'tr', x: left + width, y: top },
+            { name: 'bl', x: left, y: top + height },
+            { name: 'br', x: left + width, y: top + height },
+          ];
 
-        item._resizeHandles = [];
-        for (const corner of corners) {
-          ctx.fillStyle = 'red';
-          ctx.fillRect(corner.x - handleSize / 2, corner.y - handleSize / 2, handleSize, handleSize);
-          item._resizeHandles.push({
-            name: corner.name,
-            x: corner.x - handleSize / 2,
-            y: corner.y - handleSize / 2,
-            size: handleSize,
-          });
+          item._resizeHandles = [];
+          for (const corner of corners) {
+            ctx.fillStyle = 'red';
+            ctx.fillRect(corner.x - handleSize / 2, corner.y - handleSize / 2, handleSize, handleSize);
+            item._resizeHandles.push({
+              name: corner.name,
+              x: corner.x - handleSize / 2,
+              y: corner.y - handleSize / 2,
+              size: handleSize,
+            });
+          }
         }
       }
 
@@ -133,5 +176,6 @@ export class Canvas {
     }
 
     ctx.restore();
-  }
-}
+  } // This is the closing brace for the draw method
+
+} // This is the final closing brace for the Canvas class

@@ -1,11 +1,12 @@
+// ui.js (Updated)
 
 export function setupUI(canvas, elements, drawCallback) {
   const tool = document.getElementById('tool');
   const textInput = document.getElementById('textInput');
   const imageInput = document.getElementById('imageInput');
 
-  let isDragging = false;
-  let dragged = false;
+  let isPanning = false; // Changed from isDragging for clarity
+  let didPan = false;    // Changed from dragged for clarity
   let lastX, lastY;
 
   let draggingElement = null;
@@ -16,6 +17,14 @@ export function setupUI(canvas, elements, drawCallback) {
   let offsetY = 0;
 
   canvas.canvas.addEventListener('mousedown', (e) => {
+    // --- NEW: Handle Draw Tool ---
+    if (tool.value === 'draw') {
+      canvas.startDrawing(e.clientX, e.clientY);
+      drawCallback();
+      return; // Stop further processing for this event
+    }
+    // --- End New ---
+
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
     const selected = elements.getSelected();
 
@@ -42,15 +51,23 @@ export function setupUI(canvas, elements, drawCallback) {
       drawCallback();
     } else {
       elements.clearSelection();
-      drawCallback();
-      isDragging = true;
-      dragged = false;
+      isPanning = true;
+      didPan = false;
       lastX = e.clientX;
       lastY = e.clientY;
+      drawCallback();
     }
   });
 
   canvas.canvas.addEventListener('mousemove', (e) => {
+    // --- NEW: Handle Draw Tool ---
+    if (canvas.isDrawing) {
+      canvas.continueDrawing(e.clientX, e.clientY);
+      drawCallback();
+      return; // Stop further processing
+    }
+    // --- End New ---
+
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
 
     if (resizingElement && resizingHandle) {
@@ -58,27 +75,21 @@ export function setupUI(canvas, elements, drawCallback) {
       const dy = pos.y - resizingStart.y;
 
       if (resizingElement.type === 'image') {
-        if (resizingHandle === 'br' || resizingHandle === 'tr') {
-          resizingElement.width += dx;
-        } else {
+        if (resizingHandle === 'br' || resizingHandle === 'tr') resizingElement.width += dx;
+        else {
           resizingElement.width -= dx;
           resizingElement.x += dx;
         }
-
-        if (resizingHandle === 'br' || resizingHandle === 'bl') {
-          resizingElement.height += dy;
-        } else {
+        if (resizingHandle === 'br' || resizingHandle === 'bl') resizingElement.height += dy;
+        else {
           resizingElement.height -= dy;
           resizingElement.y += dy;
         }
-
-        resizingElement.width = resizingElement.width;
-        resizingElement.height = resizingElement.height;
       }
 
       if (resizingElement.type === 'text') {
         let newSize = resizingElement.fontSize + (dy * (resizingHandle.includes('t') ? -1 : 1));
-        resizingElement.fontSize = newSize;
+        resizingElement.fontSize = newSize; // No more size limit
       }
 
       resizingStart = { x: pos.x, y: pos.y };
@@ -90,10 +101,10 @@ export function setupUI(canvas, elements, drawCallback) {
       draggingElement.x = pos.x - offsetX;
       draggingElement.y = pos.y - offsetY;
       drawCallback();
-    } else if (isDragging) {
+    } else if (isPanning) {
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
-      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragged = true;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didPan = true;
       canvas.offsetX += dx;
       canvas.offsetY += dy;
       lastX = e.clientX;
@@ -102,8 +113,18 @@ export function setupUI(canvas, elements, drawCallback) {
     }
   });
 
-  canvas.canvas.addEventListener('mouseup', (e) => {
-    isDragging = false;
+  // Attach to window to catch mouseup events even if cursor leaves the canvas
+  window.addEventListener('mouseup', (e) => {
+    // --- NEW: Handle Draw Tool ---
+    if (canvas.isDrawing) {
+      const newPath = canvas.finishDrawing();
+      elements.addItem(newPath); // Use the new generic method
+      drawCallback();
+      return; // Stop further processing
+    }
+    // --- End New ---
+
+    isPanning = false;
     draggingElement = null;
     resizingElement = null;
     resizingStart = null;
@@ -111,7 +132,8 @@ export function setupUI(canvas, elements, drawCallback) {
 
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
 
-    if (!dragged && !elements.getSelected()) {
+    // Changed condition: only create element if we didn't pan the canvas
+    if (!didPan && !elements.getSelected()) {
       if (tool.value === 'shape') {
         elements.addShape(pos.x, pos.y, canvas.scale);
         drawCallback();

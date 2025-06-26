@@ -56,4 +56,11 @@ export class ElementsManager {
   getSelected() {
     return this.selected;
   }
+  
+  // ADD THIS METHOD
+  addItem(item) {
+    if (item) {
+      this.items.push(item);
+    }
+  }
 }
