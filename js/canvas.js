@@ -24,7 +24,7 @@ export class Canvas {
       points: [this.screenToWorld(x, y)],
       // Use the values from the options object passed by ui.js
       color: options.color,
-      lineWidth: options.lineWidth,
+      lineWidth: options.lineWidth / this.scale,
       mode: options.mode
     };
   }
@@ -129,7 +129,7 @@ export class Canvas {
         }
 
         ctx.strokeStyle = item.color;
-        ctx.lineWidth = item.lineWidth / this.scale;
+        ctx.lineWidth = item.lineWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
