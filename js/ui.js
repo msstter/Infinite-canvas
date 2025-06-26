@@ -1,20 +1,42 @@
 export function setupUI(canvas, elements, drawCallback) {
+  // --- ELEMENT REFERENCES ---
   const tool = document.getElementById('tool');
   const textInput = document.getElementById('textInput');
   const imageInput = document.getElementById('imageInput');
 
+  // Draw Menu Elements
   const drawOptionsContainer = document.getElementById('draw-options');
   const drawColorInput = document.getElementById('draw-color');
   const brushSizeInput = document.getElementById('brush-size');
   const brushSizeValue = document.getElementById('brush-size-value');
   const eraserButton = document.getElementById('eraser-tool');
 
+  // ADDED: Shape Menu Elements
+  const shapeOptionsContainer = document.getElementById('shape-options');
+  const shapeTypeSelect = document.getElementById('shape-type');
+  const shapeColorInput = document.getElementById('shape-color');
+  const shapeFillToggle = document.getElementById('shape-fill-toggle');
+  const shapeOutlineContainer = document.getElementById('shape-outline-container');
+  const shapeOutlineSizeInput = document.getElementById('shape-outline-size');
+  const shapeOutlineValue = document.getElementById('shape-outline-value');
+
+
+  // --- STATE OBJECTS ---
   const drawSettings = {
     color: '#000000',
     lineWidth: 2,
     mode: 'draw'
   };
+  
+  // ADDED: State for the shape tool
+  const shapeSettings = {
+    shapeType: 'square',
+    color: '#000000',
+    isFilled: true,
+    lineWidth: 2
+  };
 
+  // --- INTERACTION STATE VARIABLES ---
   let isPanning = false;
   let didPan = false;
   let lastX, lastY;
@@ -81,23 +103,27 @@ export function setupUI(canvas, elements, drawCallback) {
     if (resizingElement && resizingHandle) {
       const dx = pos.x - resizingStart.x;
       const dy = pos.y - resizingStart.y;
+      
+      // ADDED: Logic for resizing shapes
+      if (resizingElement.type === 'shape') {
+        const sizeChangeX = resizingHandle.includes('l') ? -dx : dx;
+        const sizeChangeY = resizingHandle.includes('t') ? -dy : dy;
+        const sizeChange = Math.abs(sizeChangeX) > Math.abs(sizeChangeY) ? sizeChangeX : sizeChangeY;
+        
+        resizingElement.size += sizeChange;
+        resizingElement.size = Math.max(5, resizingElement.size); // Prevent tiny shapes
+      }
 
       if (resizingElement.type === 'image') {
-        if (resizingHandle === 'br' || resizingHandle === 'tr') resizingElement.width += dx;
-        else {
-          resizingElement.width -= dx;
-          resizingElement.x += dx;
-        }
-        if (resizingHandle === 'br' || resizingHandle === 'bl') resizingElement.height += dy;
-        else {
-          resizingElement.height -= dy;
-          resizingElement.y += dy;
-        }
+        if (resizingHandle.includes('r')) resizingElement.width += dx;
+        if (resizingHandle.includes('l')) { resizingElement.width -= dx; resizingElement.x += dx; }
+        if (resizingHandle.includes('b')) resizingElement.height += dy;
+        if (resizingHandle.includes('t')) { resizingElement.height -= dy; resizingElement.y += dy; }
       }
 
       if (resizingElement.type === 'text') {
         let newSize = resizingElement.fontSize + (dy * (resizingHandle.includes('t') ? -1 : 1));
-        resizingElement.fontSize = newSize;
+        resizingElement.fontSize = Math.max(5, newSize);
       }
 
       resizingStart = { x: pos.x, y: pos.y };
@@ -124,12 +150,11 @@ export function setupUI(canvas, elements, drawCallback) {
   window.addEventListener('mouseup', (e) => {
     if (canvas.isDrawing) {
       const newPath = canvas.finishDrawing();
-      elements.addItem(newPath); // addItem now saves state automatically
+      elements.addItem(newPath);
       drawCallback();
       return;
     }
 
-    // MODIFIED: Save state after moving or resizing an element
     if (draggingElement || resizingElement) {
         elements.saveState();
     }
@@ -143,8 +168,9 @@ export function setupUI(canvas, elements, drawCallback) {
     const pos = canvas.screenToWorld(e.clientX, e.clientY);
 
     if (!didPan && !elements.getSelected()) {
+      // MODIFIED: Call to addShape now passes the settings object
       if (tool.value === 'shape') {
-        elements.addShape(pos.x, pos.y, canvas.scale);
+        elements.addShape(pos.x, pos.y, canvas.scale, shapeSettings);
         drawCallback();
       } else if (tool.value === 'text') {
         const text = textInput.value.trim();
@@ -166,27 +192,42 @@ export function setupUI(canvas, elements, drawCallback) {
         menu.classList.remove('visible');
     });
 
+    // MODIFIED: Now shows the shape menu when 'shape' is selected
     if (tool.value === 'draw') {
         drawOptionsContainer.classList.add('visible');
+    } else if (tool.value === 'shape') {
+        shapeOptionsContainer.classList.add('visible');
     }
   });
 
+  // Draw tool listeners
   drawColorInput.addEventListener('input', (e) => {
     drawSettings.color = e.target.value;
     drawSettings.mode = 'draw';
     eraserButton.style.backgroundColor = '';
   });
-
   brushSizeInput.addEventListener('input', (e) => {
     drawSettings.lineWidth = parseInt(e.target.value, 10);
     brushSizeValue.textContent = e.target.value;
   });
-  
   eraserButton.addEventListener('click', () => {
       drawSettings.mode = 'eraser';
       eraserButton.style.backgroundColor = '#a0c4ff';
   });
+  
+  // ADDED: Listeners for all the new shape controls
+  shapeTypeSelect.addEventListener('change', (e) => shapeSettings.shapeType = e.target.value);
+  shapeColorInput.addEventListener('input', (e) => shapeSettings.color = e.target.value);
+  shapeOutlineSizeInput.addEventListener('input', (e) => {
+    shapeSettings.lineWidth = parseInt(e.target.value, 10);
+    shapeOutlineValue.textContent = e.target.value;
+  });
+  shapeFillToggle.addEventListener('change', (e) => {
+    shapeSettings.isFilled = e.target.checked;
+    shapeOutlineContainer.style.display = e.target.checked ? 'none' : 'flex';
+  });
 
+  // Image input listener
   imageInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -202,36 +243,26 @@ export function setupUI(canvas, elements, drawCallback) {
     img.src = URL.createObjectURL(file);
   });
 
-  // --- NEW: GLOBAL KEYBOARD SHORTCUT LISTENER ---
-
+  // --- GLOBAL KEYBOARD SHORTCUT LISTENER ---
   window.addEventListener('keydown', (e) => {
-    // Don't trigger shortcuts if user is typing in the text input
-    if (e.target === textInput) return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
 
-    const isCtrlOrCmd = e.ctrlKey || e.metaKey; // Handles Ctrl for Win/Linux, Cmd for Mac
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
 
-    // Undo (Ctrl+Z or Cmd+Z)
     if (isCtrlOrCmd && e.key === 'z') {
       e.preventDefault();
       elements.undo();
       drawCallback();
     }
-
-    // Copy (Ctrl+C or Cmd+C)
     if (isCtrlOrCmd && e.key === 'c') {
       e.preventDefault();
       elements.copySelected();
-      // No redraw needed for copy
     }
-
-    // Paste (Ctrl+V or Cmd+V)
     if (isCtrlOrCmd && e.key === 'v') {
       e.preventDefault();
       elements.paste();
       drawCallback();
     }
-
-    // Delete (Delete or Backspace key)
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       if (elements.deleteSelected()) {

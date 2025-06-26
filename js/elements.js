@@ -15,9 +15,7 @@ export class ElementsManager {
     if (this.historyIndex < this.history.length - 1) {
       this.history = this.history.slice(0, this.historyIndex + 1);
     }
-    // Create a deep, serializable copy of the items array
     const serializableItems = this.items.map(item => {
-      // For images, store the src string instead of the live object
       if (item.type === 'image' && item.img instanceof HTMLImageElement) {
         return { ...item, img: { src: item.img.src } };
       }
@@ -32,7 +30,6 @@ export class ElementsManager {
       this.historyIndex--;
       const itemsFromHistory = JSON.parse(JSON.stringify(this.history[this.historyIndex]));
       
-      // "Rehydrate" the image objects from their src strings
       this.items = itemsFromHistory.map(item => {
         if (item.type === 'image') {
           const img = new Image();
@@ -61,7 +58,6 @@ export class ElementsManager {
 
   copySelected() {
     if (!this.selected) return;
-    // Use the same serialization logic as saveState for images
     let serializableItem = this.selected;
     if (this.selected.type === 'image') {
         serializableItem = { ...this.selected, img: { src: this.selected.img.src } };
@@ -75,7 +71,6 @@ export class ElementsManager {
     newItemData.x += 20;
     newItemData.y += 20;
 
-    // If it's an image, we need to create a new live Image object
     if (newItemData.type === 'image') {
       const img = new Image();
       img.src = newItemData.img.src;
@@ -87,29 +82,35 @@ export class ElementsManager {
 
   // --- ADDING & GETTING ELEMENTS ---
 
-  // RESTORED: This is your original working logic with scaling
-  addShape(x, y, scale) {
-    const size = 50 / scale;
-    const newShape = { type: 'shape', x, y, size };
+  // --- MODIFIED: This method now accepts and uses the new 'settings' object ---
+  addShape(x, y, scale, settings) {
+    const newShape = {
+      type: 'shape',
+      x,
+      y,
+      size: 50 / scale, // Keep the initial size relative to zoom
+      // Add all the new properties from our settings object
+      shapeType: settings.shapeType,
+      color: settings.color,
+      isFilled: settings.isFilled,
+      lineWidth: settings.lineWidth / scale // Also make outline relative to zoom
+    };
     this.addItem(newShape);
   }
 
-  // RESTORED: This is your original working logic with scaling
   addText(x, y, text, scale) {
     const fontSize = 20 / scale;
     const newText = { type: 'text', x, y, text, fontSize };
     this.addItem(newText);
   }
 
-  // RESTORED: This is your original working logic
   addImage(img, x, y, scale) {
-    const width = img.width / 2; // Base size on image's actual dimensions
+    const width = img.width / 2;
     const height = img.height / 2;
     const newImage = { type: 'image', img, x, y, width, height };
     this.addItem(newImage);
   }
 
-  // Generic add method that handles saving state
   addItem(item) {
     if (item) {
       this.items.push(item);
@@ -122,13 +123,13 @@ export class ElementsManager {
     return this.items;
   }
 
-  // RESTORED: Your original working text hit-detection, with shape detection added
   getElementAt(x, y) {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const item = this.items[i];
       if (item.type === 'shape') {
-        if (x >= item.x - item.size / 2 && x <= item.x + item.size / 2 &&
-            y >= item.y - item.size / 2 && y <= item.y + item.size / 2) {
+        // This simple hit-detection works for squares and circles
+        const dist = Math.sqrt((x - item.x) ** 2 + (y - item.y) ** 2);
+        if (dist < item.size / 2) {
             return item;
         }
       } else if (item.type === 'text') {

@@ -20,6 +20,7 @@
   </div>
 
   <div id="contextual-ui-container">
+
     <div id="draw-options" class="contextual-menu">
       <div class="contextual-option">
         <label for="draw-color">Color:</label>
@@ -34,6 +35,32 @@
         <button id="eraser-tool">Eraser</button>
       </div>
     </div>
+
+    <div id="shape-options" class="contextual-menu">
+      <div class="contextual-option">
+        <label for="shape-type">Shape:</label>
+        <select id="shape-type">
+          <option value="square">Square</option>
+          <option value="circle">Circle</option>
+          <option value="triangle">Triangle</option>
+          <option value="hexagon">Hexagon</option>
+        </select>
+      </div>
+      <div class="contextual-option">
+        <label for="shape-color">Color:</label>
+        <input type="color" id="shape-color" value="#000000">
+      </div>
+      <div class="contextual-option">
+        <label for="shape-fill-toggle">Fill Shape:</label>
+        <input type="checkbox" id="shape-fill-toggle" checked>
+      </div>
+      <div class="contextual-option" id="shape-outline-container" style="display: none;">
+        <label for="shape-outline-size">Outline:</label>
+        <input type="range" id="shape-outline-size" min="1" max="50" value="2">
+        <span id="shape-outline-value">2</span>
+      </div>
+    </div>
+    
   </div>
 
   <canvas id="canvas"></canvas>

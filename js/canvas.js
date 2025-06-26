@@ -8,7 +8,6 @@ export class Canvas {
     this.resize = this.resize.bind(this);
     this.selectedItem = null;
 
-    // State for continuous line drawing
     this.isDrawing = false;
     this.currentPath = null;
 
@@ -16,13 +15,11 @@ export class Canvas {
     this.resize();
   }
 
-  // MODIFIED: This method now accepts an 'options' object with color, size, and mode
   startDrawing(x, y, options) {
     this.isDrawing = true;
     this.currentPath = {
       type: 'path',
       points: [this.screenToWorld(x, y)],
-      // Use the values from the options object passed by ui.js
       color: options.color,
       lineWidth: options.lineWidth / this.scale,
       mode: options.mode
@@ -38,7 +35,6 @@ export class Canvas {
     this.isDrawing = false;
     const finishedPath = this.currentPath;
     this.currentPath = null;
-    // Only return a path if it has more than one point (i.e., not just a click)
     if (finishedPath && finishedPath.points.length > 1) {
         return finishedPath;
     }
@@ -67,14 +63,12 @@ export class Canvas {
       ctx.lineTo(x, this.canvas.height);
       ctx.stroke();
     }
-
     for (let y = startY; y < this.canvas.height; y += gridSize) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(this.canvas.width, y);
       ctx.stroke();
     }
-
     ctx.restore();
   }
 
@@ -112,9 +106,48 @@ export class Canvas {
 
     for (const item of allItems) {
       ctx.save();
+
+      // --- 1. MAIN ITEM RENDERING ---
+
       if (item.type === 'shape') {
-        ctx.fillStyle = 'black';
-        ctx.fillRect(item.x - item.size / 2, item.y - item.size / 2, item.size, item.size);
+        // REPLACED: This is the new, upgraded block for drawing all shape types
+        ctx.fillStyle = item.color;
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth = item.lineWidth;
+
+        ctx.beginPath();
+
+        switch (item.shapeType) {
+          case 'square':
+            ctx.rect(item.x - item.size / 2, item.y - item.size / 2, item.size, item.size);
+            break;
+          case 'circle':
+            ctx.arc(item.x, item.y, item.size / 2, 0, Math.PI * 2);
+            break;
+          case 'triangle':
+            const h = item.size * (Math.sqrt(3) / 2);
+            ctx.moveTo(item.x, item.y - h / 2);
+            ctx.lineTo(item.x - item.size / 2, item.y + h / 2);
+            ctx.lineTo(item.x + item.size / 2, item.y + h / 2);
+            ctx.closePath();
+            break;
+          case 'hexagon':
+            const radius = item.size / 2;
+            ctx.moveTo(item.x + radius, item.y);
+            for (let i = 1; i <= 6; i++) {
+              ctx.lineTo(
+                item.x + radius * Math.cos(Math.PI / 3 * i),
+                item.y + radius * Math.sin(Math.PI / 3 * i)
+              );
+            }
+            break;
+        }
+
+        if (item.isFilled) {
+          ctx.fill();
+        } else {
+          ctx.stroke();
+        }
       } else if (item.type === 'text') {
         ctx.fillStyle = 'blue';
         ctx.font = `${item.fontSize}px sans-serif`;
@@ -122,17 +155,13 @@ export class Canvas {
       } else if (item.type === 'image') {
         ctx.drawImage(item.img, item.x, item.y, item.width, item.height);
       } else if (item.type === 'path' && item.points.length > 1) {
-        
-        // MODIFIED: Checks for eraser mode and uses item-specific properties
         if (item.mode === 'eraser') {
-            ctx.globalCompositeOperation = 'destination-out';
+          ctx.globalCompositeOperation = 'destination-out';
         }
-
         ctx.strokeStyle = item.color;
         ctx.lineWidth = item.lineWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        
         ctx.beginPath();
         ctx.moveTo(item.points[0].x, item.points[0].y);
         for (let i = 1; i < item.points.length; i++) {
@@ -141,34 +170,43 @@ export class Canvas {
         ctx.stroke();
       }
 
+      // --- 2. SELECTION HANDLE RENDERING ---
       if (item === selectedItem) {
         ctx.strokeStyle = 'red';
         ctx.lineWidth = 2 / this.scale;
         const handleSize = 10 / this.scale;
-
         let width, height, top, left;
-        if (item.type === 'text') {
-          width = item.text.length * item.fontSize * 0.6;
-          height = item.fontSize;
-          top = item.y - height;
-          left = item.x;
-        } else if (item.type === 'image') {
-          width = item.width;
-          height = item.height;
-          top = item.y;
-          left = item.x;
+
+        // MODIFIED: Now includes a 'case' for shapes to draw the selection box
+        switch (item.type) {
+            case 'shape':
+                width = item.size;
+                height = item.size;
+                left = item.x - item.size / 2;
+                top = item.y - item.size / 2;
+                break;
+            case 'text':
+                width = item.text.length * item.fontSize * 0.6;
+                height = item.fontSize;
+                top = item.y - height;
+                left = item.x;
+                break;
+            case 'image':
+                width = item.width;
+                height = item.height;
+                top = item.y;
+                left = item.x;
+                break;
         }
 
         if (width && height) {
           ctx.strokeRect(left - 2 / this.scale, top - 2 / this.scale, width + 4 / this.scale, height + 4 / this.scale);
-
           const corners = [
             { name: 'tl', x: left, y: top },
             { name: 'tr', x: left + width, y: top },
             { name: 'bl', x: left, y: top + height },
             { name: 'br', x: left + width, y: top + height },
           ];
-
           item._resizeHandles = [];
           for (const corner of corners) {
             ctx.fillStyle = 'red';
@@ -182,10 +220,8 @@ export class Canvas {
           }
         }
       }
-
       ctx.restore();
     }
-
     ctx.restore();
   }
 }
