@@ -1,50 +1,123 @@
+/* * -----------------------------------------------------------------------------
+ * Global Styles & Resets
+ * -----------------------------------------------------------------------------
+ * These styles apply to the entire page to create a consistent, full-screen 
+ * environment.
+ */
+
 html, body {
+  /* Remove the default margin that browsers add, preventing unwanted white space. */
   margin: 0;
+  /* Hide scrollbars. This is crucial to prevent the browser window from scrolling
+     when you pan the canvas content beyond the screen edges. */
   overflow: hidden;
+  /* Set a clean, standard font for all UI elements. */
   font-family: sans-serif;
+  /* Ensure the html and body elements take up 100% of the browser window's height and width. */
   height: 100%;
   width: 100%;
 }
-#toolbar {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: white;
-  padding: 10px;
-  z-index: 10;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
+
+/* * -----------------------------------------------------------------------------
+ * Main Canvas Element
+ * -----------------------------------------------------------------------------
+ * Styles for the <canvas> element itself, which is the main drawing area.
+ */
+
 canvas {
+  /* Treat the canvas as a block-level element to prevent any extra, unwanted
+     spacing from appearing below it. */
   display: block;
+  /* Set a light grey background color for the canvas drawing area. */
   background: #f0f0f0;
+  /* Use viewport units (vw/vh) to ensure the canvas always fills the entire
+     visible browser window, from edge to edge. */
   width: 100vw;
   height: 100vh;
 }
 
+/* * -----------------------------------------------------------------------------
+ * UI Containers & Menus
+ * -----------------------------------------------------------------------------
+ * These styles control the "floating" UI elements that sit on top of the canvas.
+ */
+
+/* This ID is a typo in your provided file. Your HTML likely has #tool-container.
+   I've kept #toolbar here to match the file you sent. This styles the main
+   toolbar where the tool dropdown is. */
+#toolbar {
+  /* 'position: absolute' lifts the toolbar out of the normal document flow,
+     allowing it to float on top of other elements (like the canvas). */
+  position: absolute;
+  /* Position it 10px from the top and 10px from the left. */
+  top: 10px;
+  left: 10px;
+  /* Give it a solid background, padding for spacing, and rounded corners. */
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  /* Add a subtle shadow to make it look like it's floating above the canvas. */
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  /* 'z-index' controls the stacking order. A higher number ensures this toolbar
+     will always appear ON TOP of the canvas (which has a default z-index of 0). */
+  z-index: 10;
+}
+
+/* This is the main container that holds ALL the contextual pop-up menus. */
 #contextual-ui-container {
-    position: absolute;
-    top: 50px; /* Adjust as needed */
-    left: 10px;
-    background-color: #f0f0f0;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    padding: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  /* It is also positioned to float over the canvas, just below the main toolbar. */
+  position: absolute;
+  top: 60px; /* Adjusted to sit below the toolbar */
+  left: 10px;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  /* It also needs a z-index to ensure it's on top of the canvas. */
+  z-index: 10;
 }
 
+/* This class applies to EACH individual contextual menu (e.g., Draw Options, Shape Options). */
 .contextual-menu {
-    display: none; /* Hide all menus by default */
-    flex-direction: column;
-    gap: 10px;
+  /* CRITICAL: By default, all contextual menus are hidden. */
+  display: none;
+  /* When a menu IS visible, its internal items (the options) will stack vertically. */
+  flex-direction: column;
+  /* This adds a 10px gap between each option in the menu. */
+  gap: 10px;
 }
 
+/* This is the "magic" class that makes a menu appear. */
 .contextual-menu.visible {
-    display: flex; /* A class to make a specific menu visible */
+  /* When JavaScript adds the '.visible' class to a menu, this rule overrides
+     'display: none' and makes it appear as a flex container. */
+  display: flex;
 }
 
+/* This class styles each individual row within a contextual menu (e.g., the
+   "Color:" label plus its color picker input). */
 .contextual-option {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+  /* Use flexbox to align the label and its control (e.g., slider, dropdown)
+     on the same line. */
+  display: flex;
+  /* Vertically center the label and the control with each other. */
+  align-items: center;
+  /* Add a small 5px space between the label and its control. */
+  gap: 5px;
+}
+
+/* This class add a style so the user can see which text styles are active. 
+  This will give the buttons a "toggled" look. */
+.style-button {
+    width: 25px;
+    height: 25px;
+    border: 1px solid #aaa;
+    background-color: #fff;
+    cursor: pointer;
+}
+
+.style-button.active {
+    background-color: #a0c4ff; /* A highlight color to show it's on */
+    border-color: #0056b3;
 }

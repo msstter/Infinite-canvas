@@ -9,18 +9,18 @@
 
   <div id="toolbar">
     <select id="tool">
-      <option value="select">Select</option>
+      <option value="select">-Select Tool-</option>
       <option value="draw">Draw</option>
       <option value="shape">Shape</option>
       <option value="text">Text</option>
       <option value="image">Image</option>
+      <option value="storage">Save/Load</option>
     </select>
     <input type="text" id="textInput" placeholder="Your text here" style="display:none" />
     <input type="file" id="imageInput" accept="image/*" style="display:none" />
   </div>
 
   <div id="contextual-ui-container">
-
     <div id="draw-options" class="contextual-menu">
       <div class="contextual-option">
         <label for="draw-color">Color:</label>
@@ -35,7 +35,6 @@
         <button id="eraser-tool">Eraser</button>
       </div>
     </div>
-
     <div id="shape-options" class="contextual-menu">
       <div class="contextual-option">
         <label for="shape-type">Shape:</label>
@@ -60,7 +59,37 @@
         <span id="shape-outline-value">2</span>
       </div>
     </div>
-    
+    <div id="text-options" class="contextual-menu">
+    <div class="contextual-option">
+        <label for="font-family">Font:</label>
+        <select id="font-family">
+            <option value="Arial">Arial</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+        </select>
+    </div>
+    <div class="contextual-option">
+        <label for="text-color">Color:</label>
+        <input type="color" id="text-color" value="#0000FF"> </div>
+    <div class="contextual-option" id="text-style-buttons">
+        <button id="bold-button" class="style-button"><b>B</b></button>
+        <button id="italic-button" class="style-button"><i>I</i></button>
+        <button id="underline-button" class="style-button"><u>U</u></button>
+        <button id="strikethrough-button" class="style-button"><s>S</s></button>
+    </div>
+</div>
+    <div id="storage-options" class="contextual-menu">
+        <div class="contextual-option">
+            <button id="save-button">Save Canvas</button>
+        </div>
+        <div class="contextual-option">
+            <button id="load-button">Load Canvas</button>
+            <input type="file" id="load-input" accept=".json" style="display: none;">
+        </div>
+    </div>
+</div>
   </div>
 
   <canvas id="canvas"></canvas>
