@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        // --- type‑checking & type‑system flags ---
+        "strict": true,
+        "exactOptionalPropertyTypes": true, // (“exact optional parameters” doesn’t exist)
+        "forceConsistentCasingInFileNames": true,
+        "noFallthroughCasesInSwitch": true,
+        "skipLibCheck": true,
+        // --- emit targets suitable for modern browsers ---
+        "target": "ES2022", // ES2022‑level syntax and libs
+        "module": "ESNext", // preserve native ESM imports
+        "moduleResolution": "bundler",
+
+        // --- project structure ---
+        "rootDir": "./src",
+        "outDir": "./public"
+    },
+
+    // Only compile *.ts inside ./src
+    "include": ["src/**/*.ts"],
+    "exclude": ["**/*.ignore.*ts"]
+}

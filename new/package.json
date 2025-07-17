@@ -1,0 +1,23 @@
+{
+    "name": "new",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "tsc": "tsc",
+        "check": "tsc -w --noEmit",
+        "build": "esbuild src/app.ts --bundle --target=es2022 --outfile=public/app.js"
+    },
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "@timohausmann/quadtree-ts": "^2.2.2",
+        "dexie": "^4.0.11",
+        "pixi.js": "^8.11.0"
+    },
+    "devDependencies": {
+        "esbuild": "0.25.6",
+        "typescript": "^5.8.3"
+    }
+}
