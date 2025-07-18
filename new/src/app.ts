@@ -82,7 +82,8 @@ class CanvasDB extends Dexie {
 const db = new CanvasDB();
 
 // ─── 3.  Spatial index ───────────────────────────────────────────────────────
-const QT_BOUNDS: BBox = new Rectangle({ x: -1e6, y: -1e6, width: 2e6, height: 2e6 });
+const QT_BOUNDS: BBox = new Rectangle({ x: -1e12, y: -1e12, width: 2e12, height: 2e12 });
+
 const tree = new Quadtree<StrokeRect>(QT_BOUNDS);
 
 // on startup pull strokes from IndexedDB into the quadtree
@@ -107,7 +108,7 @@ function initListeners(draw: DrawApp) {
             const factor = e.deltaY < 0 ? 1.1 : 0.9;
             const { x, y } = screenToWorld(e.clientX, e.clientY, draw);
 
-            zoom = Math.min(Math.max(zoom * factor, 0.01), 100);
+            zoom = zoom * factor;
             world.scale.set(zoom);
 
             // keep the zoom centre fixed
@@ -222,7 +223,7 @@ function drawStroke(g: Graphics & { lastZoom?: number }, rect: StrokeRect, z: nu
     g.moveTo(...s.pts[0]);
     for (let i = 1; i < s.pts.length; i++) g.lineTo(...s.pts[i]);
 
-    const scaledStrokeWidth = s.stroke.width * (1 / z);
+    const scaledStrokeWidth = s.stroke.width / z;
 
     if (g.lastZoom !== zoom) {
         console.log("zoom level", z);
