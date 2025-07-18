@@ -184,7 +184,7 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
     window.addEventListener("pointerdown", (e) => {
         if (drawState.frozen) return;
         if (e.button !== 0 && e.pointerType === "mouse") return;
-
+        if ((e.target as HTMLElement).closest("button")) return;
         drawState.active = true;
         drawState.pointerID = e.pointerId;
         drawState.pts = [];

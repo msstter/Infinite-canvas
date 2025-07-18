@@ -29,8 +29,6 @@ const addImport = (draw: DrawApp, db: CanvasDB) => {
     btn.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         input.click();
-
-        // importCanvas(db);
     });
 
     input.addEventListener(
