@@ -8,15 +8,8 @@ export async function exportCanvas(db: CanvasDB) {
     // 1.  Read every stroke from IndexedDB
     const strokes = await db.strokes.toArray();
 
-    console.log(strokes);
-    // Remove the top level id
-    const cleanStrokes = strokes.map((stroke) => {
-        const { id, ...rest } = stroke;
-        return rest;
-    });
-
     // // 3.  Turn into a Blob and trigger download
-    const blob = new Blob([JSON.stringify(cleanStrokes)], {
+    const blob = new Blob([JSON.stringify(strokes)], {
         type: "application/json",
     });
 
