@@ -8,7 +8,7 @@ console.log("script loaded");
 type DrawState = {
     active: boolean;
     pointerID: number;
-    pts: PointTuple[];
+    pts: Point[];
     g: Graphics | null;
     width: number;
     color: number;
@@ -17,7 +17,7 @@ type DrawState = {
 const initDrawState = (): DrawState => ({
     active: false,
     pointerID: -1,
-    pts: [] as PointTuple[],
+    pts: [] as Point[],
     g: null as Graphics | null,
     width: 2,
     color: 0x0088ff,
@@ -39,6 +39,7 @@ async function initDraw(): Promise<DrawApp> {
     app.canvas.style.touchAction = "none"; // prevent page‑scroll / pinch‑zoom
     const world = new Container(); // <- everything lives here
     app.stage.addChild(world);
+    world.scale.set(getZoom());
 
     return {
         app,
@@ -49,12 +50,12 @@ async function initDraw(): Promise<DrawApp> {
 }
 
 // ─── 2.  Stroke model & DB ───────────────────────────────────────────────────
-type Point = { x: number; y: number };
-type PointTuple = [x: number, y: number];
+
+type Point = [x: number, y: number];
 
 export interface StrokeData {
     id: string;
-    pts: PointTuple[]; // polyline in world coords
+    pts: Point[]; // polyline in world coords
     stroke: {
         width: number; // world‑unit thickness
         color: number; // 0xRRGGBB
@@ -79,22 +80,65 @@ class CanvasDB extends Dexie {
         this.version(1).stores({ strokes: "id" }); // primary key only
     }
 }
+
 const db = new CanvasDB();
 
+function saveRect(db: CanvasDB, rect: StrokeRect) {
+    const cleanRect = structuredClone(rect); // deep copy, no methods
+    delete (cleanRect as any).qtIndex; // remove runtime cache
+    db.strokes.put(cleanRect);
+}
+
+// Call this in the browser console to reset the canvas
+// @ts-ignore
+window.clearDB = () => {
+    Dexie.delete("canvas")
+        .then(() => console.log("IndexedDB “canvas” deleted"))
+        .catch(console.error);
+};
+
 // ─── 3.  Spatial index ───────────────────────────────────────────────────────
-const QT_BOUNDS: BBox = new Rectangle({ x: -1e12, y: -1e12, width: 2e12, height: 2e12 });
+const QT_BOUNDS: BBox = new Rectangle({ x: -1e15, y: -1e15, width: 2e15, height: 2e15 });
 
 const tree = new Quadtree<StrokeRect>(QT_BOUNDS);
 
 // on startup pull strokes from IndexedDB into the quadtree
 (async () => {
     const all = await db.strokes.toArray();
-    for (const s of all) tree.insert(s);
+    for (const s of all) {
+        const rect = StrokeRect(s);
+        tree.insert(rect);
+    }
 })();
 
 // ─── 4.  Camera / interaction ────────────────────────────────────────────────
-let zoom = 1;
+
+let zoomExp = -100; // integer power‑of‑2 exponent  … × 2^zoomExp
+let localScale = 1; // stays in [0.5, 2)
+const getZoom = () => localScale * Math.pow(2, zoomExp); // effective scale
+const getZoomInv = () => (1 / localScale) * Math.pow(2, -zoomExp); // use for precie inverse
+
+const updateZoom = (delta: number, localScale: number, zoomExp: number): { localScale: number; zoomExp: number } => {
+    // 10 % zoom per wheel “notch”
+    const factor = delta < 0 ? 1.1 : 0.9;
+    localScale = localScale * factor;
+
+    // keep localScale in [0.5, 2) and
+    // fold the overflow/underflow into the exponent
+    while (localScale >= 2) {
+        localScale = localScale / 2;
+        zoomExp = zoomExp + 1;
+    }
+    while (localScale < 0.5) {
+        localScale = localScale * 2;
+        zoomExp = zoomExp - 1;
+    }
+
+    return { localScale, zoomExp };
+};
+
 function screenToWorld(x: number, y: number, draw: DrawApp) {
+    const zoom = getZoom();
     const inv = 1 / zoom;
     return { x: (x - draw.world.x) * inv, y: (y - draw.world.y) * inv };
 }
@@ -105,15 +149,18 @@ function initListeners(draw: DrawApp) {
         "wheel",
         (e) => {
             e.preventDefault();
-            const factor = e.deltaY < 0 ? 1.1 : 0.9;
+
             const { x, y } = screenToWorld(e.clientX, e.clientY, draw);
 
-            zoom = zoom * factor;
-            world.scale.set(zoom);
+            const updatedZoom = updateZoom(e.deltaY, localScale, zoomExp);
+            localScale = updatedZoom.localScale;
+            zoomExp = updatedZoom.zoomExp;
+
+            world.scale.set(getZoom());
 
             // keep the zoom centre fixed
-            world.x = e.clientX - x * zoom;
-            world.y = e.clientY - y * zoom;
+            world.x = e.clientX - x * getZoom();
+            world.y = e.clientY - y * getZoom();
         },
         { passive: false }
     );
@@ -142,7 +189,7 @@ function initListeners(draw: DrawApp) {
             const wPt = screenToWorld(e.clientX, e.clientY, draw);
             const last = drawState.pts[drawState.pts.length - 1];
             // add a point only if we moved > 1 world unit
-            if (Math.hypot(wPt.x - last[0], wPt.y - last[1]) < 1 / zoom) return;
+            if (Math.hypot(wPt.x - last[0], wPt.y - last[1]) < 1 / getZoom()) return;
 
             drawState.pts.push([wPt.x, wPt.y]);
 
@@ -160,7 +207,7 @@ function initListeners(draw: DrawApp) {
                         stroke: { width: drawState.width, color: drawState.color },
                     },
                 }),
-                zoom
+                getZoom()
             );
         },
         { passive: false } // IMPORTANT: stops touch scrolling while drawing
@@ -202,7 +249,7 @@ function initListeners(draw: DrawApp) {
             strokeCache.set(id, drawState.g);
         }
         tree.insert(rect);
-        db.strokes.put(rect); // async save
+        saveRect(db, rect);
 
         drawState.active = false;
     }
@@ -223,9 +270,9 @@ function drawStroke(g: Graphics & { lastZoom?: number }, rect: StrokeRect, z: nu
     g.moveTo(...s.pts[0]);
     for (let i = 1; i < s.pts.length; i++) g.lineTo(...s.pts[i]);
 
-    const scaledStrokeWidth = s.stroke.width / z;
+    const scaledStrokeWidth = s.stroke.width * getZoomInv();
 
-    if (g.lastZoom !== zoom) {
+    if (false && g.lastZoom !== getZoom()) {
         console.log("zoom level", z);
         console.log("calculated stroke width", scaledStrokeWidth);
     }
@@ -239,11 +286,11 @@ function drawStroke(g: Graphics & { lastZoom?: number }, rect: StrokeRect, z: nu
 function renderLoop(draw: DrawApp) {
     const { app, world, strokeCache } = draw;
     app.ticker.add(() => {
-        const viewW = app.renderer.width / zoom;
-        const viewH = app.renderer.height / zoom;
+        const viewW = app.renderer.width / getZoom();
+        const viewH = app.renderer.height / getZoom();
         const viewRect = new Rectangle({
-            x: -world.x / zoom,
-            y: -world.y / zoom,
+            x: -world.x / getZoom(),
+            y: -world.y / getZoom(),
             width: viewW,
             height: viewH,
         });
@@ -262,7 +309,7 @@ function renderLoop(draw: DrawApp) {
                 strokeCache.set(s.id, g);
                 world.addChild(g);
             }
-            drawStroke(g, rect, zoom);
+            drawStroke(g, rect, getZoom());
             g.visible = true;
         }
     });
