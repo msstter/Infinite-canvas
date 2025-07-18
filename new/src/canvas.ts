@@ -6,6 +6,7 @@ import Dexie, { Table } from "dexie";
 // ─── 1.  Draw init ────────────────────────────────────────────────────────────
 console.log("script loaded");
 type DrawState = {
+    frozen: boolean;
     active: boolean;
     pointerID: number;
     pts: Point[];
@@ -15,6 +16,7 @@ type DrawState = {
 };
 
 const initDrawState = (): DrawState => ({
+    frozen: false,
     active: false,
     pointerID: -1,
     pts: [] as Point[],
@@ -163,7 +165,7 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
         "wheel",
         (e) => {
             e.preventDefault();
-
+            if (drawState.frozen) return;
             const { x, y } = screenToWorld(e.clientX, e.clientY, draw);
 
             const updatedZoom = updateZoom(e.deltaY, localScale, zoomExp);
@@ -180,6 +182,7 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
     );
 
     window.addEventListener("pointerdown", (e) => {
+        if (drawState.frozen) return;
         if (e.button !== 0 && e.pointerType === "mouse") return;
 
         drawState.active = true;
@@ -198,7 +201,7 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
     window.addEventListener(
         "pointermove",
         (e) => {
-            if (!drawState.active || e.pointerId !== drawState.pointerID) return;
+            if (drawState.frozen || !drawState.active || e.pointerId !== drawState.pointerID) return;
 
             const wPt = screenToWorld(e.clientX, e.clientY, draw);
             const last = drawState.pts[drawState.pts.length - 1];
@@ -228,7 +231,7 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
     );
 
     function finishStroke() {
-        if (!drawState.active || drawState.pts.length < 2) {
+        if (drawState.frozen || !drawState.active || drawState.pts.length < 2) {
             drawState.active = false;
             return;
         }

@@ -36,10 +36,14 @@ const addImport = (draw: DrawApp, db: CanvasDB) => {
     input.addEventListener(
         "change",
         async function (e) {
+            // Pause drawing to avoid accidental click
+            draw.drawState.frozen = true;
+            draw.drawState.active = false;
             const files = this.files;
             if (!files || files.length == 0) return;
             const json: File = files[0];
             await importCanvas(json, draw, db);
+            draw.drawState.frozen = false;
         },
         false
     );
