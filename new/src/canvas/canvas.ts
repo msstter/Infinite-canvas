@@ -135,7 +135,7 @@ window.clearDB = clearDB; // us in browser inspector
 
 // ─── 4.  Camera / interaction ────────────────────────────────────────────────
 
-let zoomExp = -10; // integer power‑of‑2 exponent  … × 2^zoomExp
+let zoomExp = -25; // integer power‑of‑2 exponent  … × 2^zoomExp
 let localScale = 1; // stays in [0.5, 2)
 const getZoom = () => localScale * Math.pow(2, zoomExp); // effective scale
 const getZoomInv = () => (1 / localScale) * Math.pow(2, -zoomExp); // use for precie inverse
@@ -238,6 +238,12 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
     );
 
     function finishStroke() {
+        if (drawState.g) {
+            world.removeChild(drawState.g);
+            strokeCache.delete("temp");
+            drawState.g = null;
+        }
+
         if (drawState.frozen || !drawState.active || drawState.pts.length < 2) {
             drawState.active = false;
             return;
@@ -256,22 +262,17 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
         const minY = Math.min(...ys);
         const maxY = Math.max(...ys);
         const margin = getScaledStroke(drawState.width / 2);
-
+        const scaledWidth = getScaledStroke(drawState.width);
         const uuid = crypto.randomUUID();
         const rect = StrokeRect({
             id: uuid,
             x: minX - margin,
             y: minY - margin,
-            width: maxX - minX + drawState.width,
-            height: maxY - minY + drawState.width,
+            width: maxX - minX + scaledWidth,
+            height: maxY - minY + scaledWidth,
             data,
         });
 
-        // turn the “temp” graphics permanent
-        if (drawState.g) {
-            strokeCache.delete("temp");
-            strokeCache.set(uuid, drawState.g);
-        }
         draw.tree.insert(rect);
         saveRect(db, rect);
 
@@ -294,7 +295,7 @@ function drawStroke(g: Graphics & { lastZoom?: number }, rect: StrokeRect, z: nu
     g.moveTo(...s.pts[0]);
     for (let i = 1; i < s.pts.length; i++) g.lineTo(...s.pts[i]);
 
-    if (false && g.lastZoom !== getZoom()) {
+    if (g.lastZoom !== getZoom()) {
         console.log("zoom level", z);
         console.log("calculated stroke width", s.stroke.width);
     }
@@ -329,7 +330,7 @@ function getViewRectWithMargin(app: Application, world: Container, marginWorld: 
 export function renderLoop(draw: DrawApp) {
     const { app, world, strokeCache } = draw;
     app.ticker.add(() => {
-        const viewWithMargin = getViewRectWithMargin(app, world, 512);
+        // const viewWithMargin = getViewRectWithMargin(app, world, 512);
 
         updateFractalLandmarks(draw.fractalCtx, getViewRect(app, world), getZoom());
 
@@ -342,7 +343,9 @@ export function renderLoop(draw: DrawApp) {
             height: viewH,
         });
 
+        // This is the key step that uses the quad tree to determine which strokes are visible.
         const visible = draw.tree.retrieve(viewRect);
+
         // hide everything, then show only visible
         strokeCache.forEach((g, id) => {
             if (id !== "temp") g.visible = false; // don’t hide the live stroke preview

@@ -54,8 +54,8 @@ const MAX_PLACEMENT_ATTEMPTS = 50;
 export function createFractalLandmarks(seed = 1): FractalLandmarksContext {
     const fullConfig: FractalConfig = {
         rootCount: 5,
-        rootRadiusRange: [8e6, 16e6],
-        childRadiusFrac: [0.22, 0.45],
+        rootRadiusRange: [8e9, 16e9],
+        childRadiusFrac: [0.1, 0.15],
         childCountRange: [6, 9],
         childAreaFractionMax: 0.45,
         childPlacementScale: 0.85,
@@ -74,60 +74,62 @@ export function createFractalLandmarks(seed = 1): FractalLandmarksContext {
     // Deterministically scatter root blobs around origin.
     const roots: BlobNode[] = [];
     const rootRng = makeRng(seed);
-    let node: BlobNode | null = null;
+
+    // --- CORRECTED ROOT GENERATION LOOP ---
     for (let i = 0; i < fullConfig.rootCount; i++) {
-        const r = lerp(fullConfig.rootRadiusRange[0], fullConfig.rootRadiusRange[1], rootRng());
-        // polar placement with deterministic jitter
+        // 1. Move the `node` declaration inside the loop for correct scope
+        let node: BlobNode | null = null;
 
-        let cx: number;
-        let cy: number;
+        // 2. Add the missing retry loop for placement
+        for (let attempt = 0; attempt < MAX_PLACEMENT_ATTEMPTS; attempt++) {
+            const r = lerp(fullConfig.rootRadiusRange[0], fullConfig.rootRadiusRange[1], rootRng());
+            let cx: number;
+            let cy: number;
 
-        // --- THIS IS THE FIX ---
-        if (i === 0) {
-            // Pin the first root to the origin to guarantee visibility on load.
-            cx = 0;
-            cy = 0;
-        } else {
-            // Scatter the other roots as before
-            const theta = rootRng() * Math.PI * 2;
-            const dist = r * (1.5 + rootRng() * 2.5); // keep them apart
-            cx = Math.cos(theta) * dist;
-            cy = Math.sin(theta) * dist;
-        }
-
-        let isColliding = false;
-        for (const otherRoot of roots) {
-            const requiredDist = (r + otherRoot.radius) * fullConfig.blobSpacing;
-            if (distance(cx, cy, otherRoot.cx, otherRoot.cy) < requiredDist) {
-                isColliding = true;
-                break; // Collision found, break inner loop
+            if (i === 0) {
+                cx = 0;
+                cy = 0;
+            } else {
+                const theta = rootRng() * Math.PI * 2;
+                const dist = r * (1.5 + rootRng() * 2.5);
+                cx = Math.cos(theta) * dist;
+                cy = Math.sin(theta) * dist;
             }
 
+            // 3. Perform collision check against ALL existing roots first
+            let isColliding = false;
+            for (const otherRoot of roots) {
+                const requiredDist = (r + otherRoot.radius) * fullConfig.blobSpacing;
+                if (distance(cx, cy, otherRoot.cx, otherRoot.cy) < requiredDist) {
+                    isColliding = true;
+                    break; // Collision found, break this inner loop and retry
+                }
+            }
+
+            // 4. ONLY if no collisions were found, create the node and break the retry loop
             if (!isColliding) {
-                const node: BlobNode = {
+                node = {
                     id: `L0_${i}`,
                     level: 0,
                     cx,
                     cy,
                     radius: r,
-                    bbox: {
-                        x: cx - r,
-                        y: cy - r,
-                        width: r * 2,
-                        height: r * 2,
-                    },
+                    bbox: { x: cx - r, y: cy - r, width: r * 2, height: r * 2 },
                     generatedChildren: false,
                     children: [],
-                    color: COLOR_EVEN, // level 0 = even
+                    color: COLOR_EVEN,
                 };
-                break;
+                break; // Success! Exit the `attempt` loop.
             }
-        }
+        } // End of retry loop
+
+        // Add the successfully created node (if any) to our collections
         if (node) {
             nodes.set(node.id, node);
             roots.push(node);
         } else {
-            console.warn(`Could not place root blob ${i} after ${MAX_ROOT_ATTEMPTS} attempts.`);
+            // This now correctly reports if a blob couldn't be placed
+            console.warn(`Could not place root blob ${i} after ${MAX_PLACEMENT_ATTEMPTS} attempts.`);
         }
     }
 
