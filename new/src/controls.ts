@@ -1,5 +1,5 @@
 // controls.ts
-import { CanvasDB, clearDB, DrawApp } from "./canvas";
+import { CanvasDB, clearDB, DrawApp } from "./canvas/canvas";
 import { exportCanvas, importCanvas } from "./exportLoad";
 const addClear = () => {
     const btn = document.querySelector(".clear-btn");

@@ -2,6 +2,7 @@
 import { Application, Container, Graphics } from "pixi.js";
 import { Quadtree, Rectangle } from "@timohausmann/quadtree-ts";
 import Dexie, { Table } from "dexie";
+import { createFractalLandmarks, updateFractalLandmarks, FractalLandmarksContext } from "./fractalLandmarks";
 
 // ─── 1.  Draw init ────────────────────────────────────────────────────────────
 console.log("script loaded");
@@ -31,11 +32,12 @@ export type DrawApp = {
     strokeCache: Map<string, Graphics>;
     tree: Quadtree<StrokeRect>;
     drawState: DrawState;
+    fractalCtx: FractalLandmarksContext;
 };
 
 const initQuadtree = (): Quadtree<StrokeRect> => {
     // ─── 3.  Spatial index ───────────────────────────────────────────────────────
-    const QT_BOUNDS: BBox = { x: -1e10, y: -1e10, width: 2e10, height: 2e10 };
+    const QT_BOUNDS: BBox = { x: -1e13, y: -1e13, width: 2e13, height: 2e13 };
 
     return new Quadtree<StrokeRect>(QT_BOUNDS);
 };
@@ -48,6 +50,9 @@ export async function initDraw(): Promise<DrawApp> {
 
     app.canvas.style.touchAction = "none"; // prevent page‑scroll / pinch‑zoom
     const world = new Container(); // <- everything lives here
+    const fractalCtx = createFractalLandmarks(12345); // optional seed
+    world.addChildAt(fractalCtx.container, 0); // background under strokes
+
     app.stage.addChild(world);
     world.scale.set(getZoom());
 
@@ -57,6 +62,7 @@ export async function initDraw(): Promise<DrawApp> {
         strokeCache: new Map(),
         drawState: initDrawState(),
         tree: initQuadtree(),
+        fractalCtx,
     };
 }
 
@@ -129,11 +135,12 @@ window.clearDB = clearDB; // us in browser inspector
 
 // ─── 4.  Camera / interaction ────────────────────────────────────────────────
 
-let zoomExp = -100; // integer power‑of‑2 exponent  … × 2^zoomExp
+let zoomExp = -10; // integer power‑of‑2 exponent  … × 2^zoomExp
 let localScale = 1; // stays in [0.5, 2)
 const getZoom = () => localScale * Math.pow(2, zoomExp); // effective scale
 const getZoomInv = () => (1 / localScale) * Math.pow(2, -zoomExp); // use for precie inverse
 
+const getScaledStroke = (strokeWith: number) => (strokeWith / localScale) * Math.pow(2, -zoomExp);
 const updateZoom = (delta: number, localScale: number, zoomExp: number): { localScale: number; zoomExp: number } => {
     // 10 % zoom per wheel “notch”
     const factor = delta < 0 ? 1.1 : 0.9;
@@ -188,8 +195,8 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
         drawState.active = true;
         drawState.pointerID = e.pointerId;
         drawState.pts = [];
-        const wPt = screenToWorld(e.clientX, e.clientY, draw);
-        drawState.pts.push([wPt.x, wPt.y]);
+        const worldPoint = screenToWorld(e.clientX, e.clientY, draw);
+        drawState.pts.push([worldPoint.x, worldPoint.y]);
 
         drawState.g = new Graphics();
         strokeCache.set("temp", drawState.g);
@@ -203,12 +210,12 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
         (e) => {
             if (drawState.frozen || !drawState.active || e.pointerId !== drawState.pointerID) return;
 
-            const wPt = screenToWorld(e.clientX, e.clientY, draw);
+            const worldPoint = screenToWorld(e.clientX, e.clientY, draw);
             const last = drawState.pts[drawState.pts.length - 1];
             // add a point only if we moved > 1 world unit
-            if (Math.hypot(wPt.x - last[0], wPt.y - last[1]) < 1 / getZoom()) return;
+            if (Math.hypot(worldPoint.x - last[0], worldPoint.y - last[1]) < 1 / getZoom()) return;
 
-            drawState.pts.push([wPt.x, wPt.y]);
+            drawState.pts.push([worldPoint.x, worldPoint.y]);
 
             drawStroke(
                 drawState.g!,
@@ -221,7 +228,7 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
                     height: 0,
                     data: {
                         pts: drawState.pts,
-                        stroke: { width: drawState.width, color: drawState.color },
+                        stroke: { width: getScaledStroke(drawState.width), color: drawState.color },
                     },
                 }),
                 getZoom()
@@ -238,21 +245,21 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
 
         const data: StrokeData = {
             pts: drawState.pts,
-            stroke: { width: drawState.width, color: drawState.color },
+            stroke: { width: getScaledStroke(drawState.width), color: drawState.color },
         };
 
         // bounding box (+margin)
         const xs = drawState.pts.map((p) => p[0]);
         const ys = drawState.pts.map((p) => p[1]);
-        const minX = Math.min(...xs),
-            maxX = Math.max(...xs);
-        const minY = Math.min(...ys),
-            maxY = Math.max(...ys);
-        const margin = drawState.width / 2;
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        const margin = getScaledStroke(drawState.width / 2);
 
-        const id = crypto.randomUUID();
+        const uuid = crypto.randomUUID();
         const rect = StrokeRect({
-            id,
+            id: uuid,
             x: minX - margin,
             y: minY - margin,
             width: maxX - minX + drawState.width,
@@ -263,7 +270,7 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
         // turn the “temp” graphics permanent
         if (drawState.g) {
             strokeCache.delete("temp");
-            strokeCache.set(id, drawState.g);
+            strokeCache.set(uuid, drawState.g);
         }
         draw.tree.insert(rect);
         saveRect(db, rect);
@@ -287,22 +294,45 @@ function drawStroke(g: Graphics & { lastZoom?: number }, rect: StrokeRect, z: nu
     g.moveTo(...s.pts[0]);
     for (let i = 1; i < s.pts.length; i++) g.lineTo(...s.pts[i]);
 
-    const scaledStrokeWidth = s.stroke.width * getZoomInv();
-
     if (false && g.lastZoom !== getZoom()) {
         console.log("zoom level", z);
-        console.log("calculated stroke width", scaledStrokeWidth);
+        console.log("calculated stroke width", s.stroke.width);
     }
 
-    g.stroke({ width: scaledStrokeWidth, color: s.stroke.color });
+    g.stroke({ width: s.stroke.width, color: s.stroke.color });
     g.lastZoom = z; // remember what zoom we used
 }
 
 // ─── 6.  Render loop with quadtree culling ───────────────────────────────────
 
+function getViewRect(app: Application, world: Container): BBox {
+    const z = getZoom();
+    return new Rectangle({
+        x: -world.x / z,
+        y: -world.y / z,
+        width: app.renderer.width / z,
+        height: app.renderer.height / z,
+    });
+}
+
+function getViewRectWithMargin(app: Application, world: Container, marginWorld: number): BBox {
+    const z = getZoom();
+    const base = getViewRect(app, world);
+    return new Rectangle({
+        x: base.x - marginWorld,
+        y: base.y - marginWorld,
+        width: base.width + 2 * marginWorld,
+        height: base.height + 2 * marginWorld,
+    });
+}
+
 export function renderLoop(draw: DrawApp) {
     const { app, world, strokeCache } = draw;
     app.ticker.add(() => {
+        const viewWithMargin = getViewRectWithMargin(app, world, 512);
+
+        updateFractalLandmarks(draw.fractalCtx, getViewRect(app, world), getZoom());
+
         const viewW = app.renderer.width / getZoom();
         const viewH = app.renderer.height / getZoom();
         const viewRect = new Rectangle({

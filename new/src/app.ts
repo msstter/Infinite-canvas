@@ -1,5 +1,5 @@
 // app.ts
-import { initDB, initListeners, initDraw, renderLoop } from "./canvas";
+import { initDB, initListeners, initDraw, renderLoop } from "./canvas/canvas";
 import { initControlListeners } from "./controls";
 
 function initApp() {

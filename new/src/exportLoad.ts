@@ -1,7 +1,7 @@
 // exportLoad.ts
 // Export provides functionality to export the user's data to a json file.
 
-import { CanvasDB, DrawApp, StrokeRect } from "./canvas";
+import { CanvasDB, DrawApp, StrokeRect } from "./canvas/canvas";
 
 // Save provides functionality to load the user's data from a json file.
 export async function exportCanvas(db: CanvasDB) {
