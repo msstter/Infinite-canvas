@@ -2,4 +2,4 @@ tsconfig.tsbuildinfo
 public/*.js
 public/*.d.ts
 node_modules
-**/*.js.map
+*.js.map
