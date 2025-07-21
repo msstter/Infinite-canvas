@@ -6,7 +6,8 @@
         "test": "echo \"Error: no test specified\" && exit 1",
         "tsc": "tsc",
         "check": "tsc -w --noEmit",
-        "build": "esbuild src/app.ts --bundle --target=es2022 --sourcemap --outfile=public/app.js"
+        "build": "esbuild src/app.ts --bundle --target=es2022 --sourcemap --outfile=public/app.js",
+        "build-matt": "esbuild src/matt/app.ts --bundle --target=es2022 --sourcemap --outfile=src/matt/public/app.js"
     },
     "author": "",
     "license": "ISC",
