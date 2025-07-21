@@ -61,7 +61,7 @@ export function createFractalLandmarks(seed = 1): FractalLandmarksContext {
         childPlacementScale: 0.85,
         blobSpacing: 1.1,
         minPixelRadius: 2,
-        maxDepth: 100,
+        maxDepth: 30,
         segments: 50,
     };
 
@@ -193,7 +193,8 @@ export function updateFractalLandmarks(ctx: FractalLandmarksContext, viewRect: B
 /* -------------------------------------------------- */
 
 // const COLOR_EVEN = 0x0f2e1b; // green
-const COLOR_EVEN = 0x04150c; // green
+// const COLOR_EVEN = 0x04150c; // green
+const COLOR_EVEN = 0x1b180c;
 const COLOR_ODD = 0x000000; // black
 
 function generateChildren(parent: BlobNode, ctx: FractalLandmarksContext) {
