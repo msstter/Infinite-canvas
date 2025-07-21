@@ -1,7 +1,7 @@
-import { ActiveTool, activeToolKey } from "./../canvas/canvas";
-import { DrawApp, activeToolKey } from "../canvas/canvas";
+import { ActiveTool, activeToolKey, singleSubscribe, appStore } from "../appState";
+import { DrawApp } from "../canvas/canvas";
 
-const getActiveTool = (el: HTMLElement): ActiveTool => {
+const getToolDataAttr = (el: HTMLElement): ActiveTool => {
     const tool = el.getAttribute("data-tool");
     if (activeToolKey.includes(tool as ActiveTool)) {
         return tool as ActiveTool;
@@ -14,16 +14,23 @@ const getActiveTool = (el: HTMLElement): ActiveTool => {
 export function initPalletButtons(draw: DrawApp) {
     const palletButtons = document.querySelectorAll(".pallet-btn") as NodeListOf<HTMLButtonElement>;
 
-    const handlePointerDown = (e: PointerEvent) => {
-        palletButtons.forEach((button) => {
-            button.classList.remove("selected");
+    // Handle updating based on active tool change in a single place.
+    singleSubscribe.activeTool((tool) => {
+        console.log("Active tool changed: ", tool);
+        palletButtons.forEach((btn) => {
+            if (getToolDataAttr(btn) === tool) {
+                btn.classList.add("selected");
+            } else {
+                btn.classList.remove("selected");
+            }
         });
+    });
+
+    const handlePointerDown = (e: PointerEvent) => {
         if (e.currentTarget) {
             const btn = e.currentTarget as HTMLButtonElement;
-            btn.classList.add("selected");
-            const tool = getActiveTool(btn);
-            draw.drawState.activeTool = tool;
-            console.log("active tool", draw.drawState.activeTool);
+            const tool = getToolDataAttr(btn);
+            appStore.setState({ activeTool: tool });
         }
     };
 

@@ -8,7 +8,6 @@
         "check": "tsc -w --noEmit",
         "build": "esbuild src/app.ts --bundle --target=es2022 --sourcemap --outfile=public/app.js",
         "build-matt": "esbuild src/matt/app.ts --bundle --target=es2022 --sourcemap --outfile=src/matt/app.js"
-
     },
     "author": "",
     "license": "ISC",
@@ -16,7 +15,8 @@
     "dependencies": {
         "@timohausmann/quadtree-ts": "^2.2.2",
         "dexie": "^4.0.11",
-        "pixi.js": "^8.11.0"
+        "pixi.js": "^8.11.0",
+        "zustand": "^5.0.6"
     },
     "devDependencies": {
         "esbuild": "0.25.6",

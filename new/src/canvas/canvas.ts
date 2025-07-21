@@ -7,12 +7,9 @@ import { createFractalLandmarks, updateFractalLandmarks, FractalLandmarksContext
 // ─── 1.  Draw init ────────────────────────────────────────────────────────────
 console.log("script loaded");
 
-export const activeToolKey = ["draw", "notecard", "zoom"] as const;
-export type ActiveTool = (typeof activeToolKey)[number];
 type DrawState = {
     frozen: boolean;
     active: boolean;
-    activeTool: ActiveTool;
     pointerID: number;
     pts: Point[];
     g: Graphics | null;
@@ -23,7 +20,6 @@ type DrawState = {
 const initDrawState = (): DrawState => ({
     frozen: false,
     active: false,
-    activeTool: "draw",
     pointerID: -1,
     pts: [] as Point[],
     g: null as Graphics | null,
