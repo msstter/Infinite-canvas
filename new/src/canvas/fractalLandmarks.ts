@@ -194,7 +194,8 @@ export function updateFractalLandmarks(ctx: FractalLandmarksContext, viewRect: B
 
 // const COLOR_EVEN = 0x0f2e1b; // green
 // const COLOR_EVEN = 0x04150c; // green
-const COLOR_EVEN = 0x1b180c;
+// const COLOR_EVEN = 0x1b180c;
+const COLOR_EVEN = 0x1a1b0c;
 const COLOR_ODD = 0x000000; // black
 
 function generateChildren(parent: BlobNode, ctx: FractalLandmarksContext) {

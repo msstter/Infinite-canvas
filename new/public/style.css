@@ -12,6 +12,20 @@ button {
     appearance: none;
 }
 
+
+ul {
+    margin: 0;
+    padding: 0;
+}
+
+li {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+
+
 canvas {
     height: 100%;
     width: 100%;
@@ -24,17 +38,14 @@ canvas {
     top: 0;
     width: 100%;
     height: 80px;
-
+    display: flex;
+    margin-left: auto;
 
 }
 
 .top-controls ul {
     display: flex;
-
-}
-
-.top-controls li {
-    list-style: none;
+    margin-left: auto;
 }
 
 .top-controls .control-btn {
@@ -42,5 +53,33 @@ canvas {
    border: none;
    padding: 10px;
    margin-left: 20px;
+
+}
+
+.pallet {
+    position: fixed;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 100%;
+
+}
+
+.pallet ul {
+    display: flex;
+    flex-direction: column;
+}
+
+.pallet li {
+    margin-bottom: 20px;
+}
+
+.pallet-btn {
+    padding: 10px;
+
+}
+
+.pallet-btn.selected {
+   background: #92e9e3;
 
 }
