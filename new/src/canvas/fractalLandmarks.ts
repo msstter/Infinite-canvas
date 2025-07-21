@@ -54,12 +54,12 @@ const MAX_PLACEMENT_ATTEMPTS = 50;
 export function createFractalLandmarks(seed = 1): FractalLandmarksContext {
     const fullConfig: FractalConfig = {
         rootCount: 5,
-        rootRadiusRange: [8e9, 16e9],
-        childRadiusFrac: [0.1, 0.15],
-        childCountRange: [6, 9],
+        rootRadiusRange: [8e10, 16e10],
+        childRadiusFrac: [0.15, 0.2],
+        childCountRange: [5, 7],
         childAreaFractionMax: 0.45,
         childPlacementScale: 0.85,
-        blobSpacing: 1.1,
+        blobSpacing: 1.2,
         minPixelRadius: 2,
         maxDepth: 30,
         segments: 50,
@@ -266,8 +266,8 @@ function makeNodePolygon(rng: () => number, radius: number, segments: number) {
     const pts: [number, number][] = [];
     for (let i = 0; i < segments; i++) {
         const t = (i / segments) * Math.PI * 2;
-        // jitter ~ ±20%
-        const jitter = 0.8 + rng() * 0.2;
+
+        const jitter = 0.8 + rng() * 0.15;
         const rr = radius * jitter;
         pts.push([Math.cos(t) * rr, Math.sin(t) * rr]);
     }
