@@ -2,7 +2,7 @@
 import { Quadtree, Rectangle } from "@timohausmann/quadtree-ts";
 import { createStore, StoreApi } from "zustand/vanilla";
 import { subscribeWithSelector } from "zustand/middleware";
-import { StrokeData, BBox, StrokeProperties, QuadItem, getQuadItem } from "../canvas/types";
+import { StrokeData, BBox, StrokeProperties, QuadItem, getQuadItem, TextCardProperties, isStroke, isTextCard } from "../canvas/types";
 import { DrawingDB } from "./DrawingDB";
 import { DrawingDataService } from "./DrawingDataService";
 
@@ -108,7 +108,7 @@ export class DrawingModel {
 
         // Update state
         this.tree.insert(rect);
-        this.saveRectToDB(rect);
+        this.saveItemToDB(rect);
 
         // Notify all subscribers that data has changed by incrementing the revision.
         this.store.getState().incrementRevision();
@@ -136,13 +136,23 @@ export class DrawingModel {
     /**
      * Private helper to save a stroke to the database, cleaning it first.
      */
-    private saveRectToDB(rect: QuadItem<StrokeProperties>): void {
+    private saveItemToDB(rect: QuadItem<StrokeProperties | TextCardProperties>): void {
         // structuredClone creates a deep copy and removes methods/prototypes.
         const clone = structuredClone(rect);
         // The quadtree adds a private `qtIndex` property during insertion; we must remove it before saving.
-        const { qtIndex, ...rest } = clone;
 
-        this.db.strokes.put(rest);
+        if (isStroke(clone)) {
+            const { qtIndex, ...rest } = clone;
+            this.db.strokes.put(rest);
+        } else if (isTextCard(clone)) {
+            const { qtIndex, ...rest } = clone;
+            this.db.textCards.put(rest);
+        }
+    }
+    public addTextCard(rect: QuadItem<TextCardProperties>): void {
+        this.tree.insert(rect);
+        this.saveItemToDB(rect);
+        this.store.getState().incrementRevision();
     }
 
     public async exportDrawingData() {

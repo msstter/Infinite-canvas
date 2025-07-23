@@ -1,3 +1,4 @@
+// appState.ts
 import { createStore } from "zustand/vanilla";
 
 import { subscribeWithSelector } from "zustand/middleware";
