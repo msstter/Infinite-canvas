@@ -166,6 +166,6 @@ export class Notecard {
 }
 
 export function initNotecard() {
-    const card = new Notecard(20, 20, 250, 200);
+    const card = new Notecard(20, 20, 508, 304);
     document.body.appendChild(card.getElement());
 }

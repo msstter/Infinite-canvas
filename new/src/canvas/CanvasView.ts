@@ -2,7 +2,7 @@
 import { Application, Container, Graphics, Rectangle, ApplicationOptions } from "pixi.js";
 import { DrawingModel } from "../DrawingData/DrawingModel";
 import { createFractalLandmarks, updateFractalLandmarks, FractalLandmarksContext } from "./fractalLandmarks";
-import { StrokeData, StrokeRect, BBox, StrokeRectProperties, CanvasViewOptions } from "./types";
+import { StrokeData, BBox, StrokeProperties, CanvasViewOptions, QuadItem, getQuadItem, isStroke } from "./types";
 
 type DrawState = {
     frozen: boolean;
@@ -175,13 +175,14 @@ export class CanvasView {
 
                 this.drawState.pts.push([worldPoint.x, worldPoint.y]);
 
-                const tempRect = StrokeRect({
+                const tempRect = getQuadItem({
                     id: "temp",
                     x: 0,
                     y: 0,
                     width: 0,
                     height: 0,
                     data: {
+                        type: "stroke-rect",
                         pts: this.drawState.pts,
                         stroke: { width: this._getScaledStroke(this.drawState.width), color: this.drawState.color },
                     },
@@ -204,6 +205,7 @@ export class CanvasView {
             }
 
             const data: StrokeData = {
+                type: "stroke-rect",
                 pts: this.drawState.pts,
                 stroke: { width: this._getScaledStroke(this.drawState.width), color: this.drawState.color },
             };
@@ -236,7 +238,7 @@ export class CanvasView {
             updateFractalLandmarks(this.fractalCtx, viewRect, this._getZoom());
 
             // Get only the strokes visible in this view's viewport from the shared model
-            const visible = this.model.getVisibleStrokes(viewRect);
+            const visible = this.model.getVisibleItems(viewRect);
 
             // Hide all cached graphics except the live drawing one
             this.strokeCache.forEach((g, id) => {
@@ -244,15 +246,17 @@ export class CanvasView {
             });
 
             // Draw and show the visible strokes
-            for (const rect of visible) {
-                let g = this.strokeCache.get(rect.id);
-                if (!g) {
-                    g = new Graphics();
-                    this.strokeCache.set(rect.id, g);
-                    this.world.addChild(g);
+            for (const item of visible) {
+                if (isStroke(item)) {
+                    let g = this.strokeCache.get(item.id);
+                    if (!g) {
+                        g = new Graphics();
+                        this.strokeCache.set(item.id, g);
+                        this.world.addChild(g);
+                    }
+                    this._drawStroke(g, item, this._getZoom());
+                    g.visible = true;
                 }
-                this._drawStroke(g, rect, this._getZoom());
-                g.visible = true;
             }
         });
     }
@@ -292,7 +296,7 @@ export class CanvasView {
         };
     }
 
-    private _drawStroke(g: Graphics & { lastZoom?: number }, rect: StrokeRect, z: number): void {
+    private _drawStroke(g: Graphics & { lastZoom?: number }, rect: QuadItem<StrokeProperties>, z: number): void {
         if (rect.id !== "temp" && g.lastZoom === z) return;
 
         const s = rect.data;

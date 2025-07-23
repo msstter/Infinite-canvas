@@ -14,10 +14,10 @@ function initApp() {
     initPalletButtons();
 
     // Test second canvas
-    const canvas2Container: HTMLElement | null = document.querySelector(".nested-canvas");
-    if (canvas2Container) {
-        const mainCanvasView = new CanvasView(canvas2Container, model, { mainCanvas: false, width: 400, height: 250 });
-    }
+    // const canvas2Container: HTMLElement | null = document.querySelector(".nested-canvas");
+    // if (canvas2Container) {
+    //     const mainCanvasView = new CanvasView(canvas2Container, model, { mainCanvas: false, width: 400, height: 250 });
+    // }
 }
 
 window.onload = initApp;

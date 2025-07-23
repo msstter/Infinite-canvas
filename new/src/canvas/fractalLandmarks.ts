@@ -1,5 +1,5 @@
 // fractalLandmarks.ts
-import type { BBox } from "./DEPRECATED_canvas.ignore";
+import type { BBox } from "./types";
 import { Container, Graphics } from "pixi.js";
 
 /**

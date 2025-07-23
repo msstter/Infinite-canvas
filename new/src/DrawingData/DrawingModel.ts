@@ -2,7 +2,7 @@
 import { Quadtree, Rectangle } from "@timohausmann/quadtree-ts";
 import { createStore, StoreApi } from "zustand/vanilla";
 import { subscribeWithSelector } from "zustand/middleware";
-import { StrokeData, StrokeRect, BBox, StrokeRectProperties } from "../canvas/DEPRECATED_canvas.ignore"; // Assuming types are exported from canvas.ts
+import { StrokeData, BBox, StrokeProperties, QuadItem, getQuadItem } from "../canvas/types";
 import { DrawingDB } from "./DrawingDB";
 import { DrawingDataService } from "./DrawingDataService";
 
@@ -40,7 +40,7 @@ const createDrawingModelStore = () => {
 
 export class DrawingModel {
     /** The single source of truth for all stroke geometry, spatially indexed. */
-    private tree: Quadtree<StrokeRect>;
+    private tree: Quadtree<QuadItem>;
 
     /** The database instance for persisting strokes. */
     private db: DrawingDB;
@@ -67,7 +67,7 @@ export class DrawingModel {
             const allStrokes = await this.db.strokes.toArray();
             for (const s of allStrokes) {
                 // The data from Dexie is a plain object, so we recreate the StrokeRect instance.
-                const rect = StrokeRect(s as StrokeRectProperties);
+                const rect = getQuadItem(s as StrokeProperties);
                 this.tree.insert(rect);
             }
             console.log(`DrawingModel: Initialized with ${allStrokes.length} strokes from DB.`);
@@ -97,7 +97,7 @@ export class DrawingModel {
         // Add a margin around the bounding box based on the stroke width
         const margin = data.stroke.width / 2;
 
-        const rect = StrokeRect({
+        const rect = getQuadItem<StrokeProperties>({
             id: crypto.randomUUID(),
             x: minX - margin,
             y: minY - margin,
@@ -120,7 +120,7 @@ export class DrawingModel {
      * @param bounds The visible area of a canvas.
      * @returns An array of StrokeRect objects.
      */
-    public getVisibleStrokes(bounds: BBox): StrokeRect[] {
+    public getVisibleItems(bounds: BBox): QuadItem[] {
         // The quadtree library's retrieve method is highly efficient.
         return this.tree.retrieve(new Rectangle(bounds));
     }
@@ -128,20 +128,21 @@ export class DrawingModel {
     /**
      * Private helper to initialize the quadtree with vast bounds.
      */
-    private initQuadtree(): Quadtree<StrokeRect> {
+    private initQuadtree(): Quadtree<QuadItem> {
         const QT_BOUNDS: BBox = { x: -1e13, y: -1e13, width: 2e13, height: 2e13 };
-        return new Quadtree<StrokeRect>(QT_BOUNDS);
+        return new Quadtree<QuadItem>(QT_BOUNDS);
     }
 
     /**
      * Private helper to save a stroke to the database, cleaning it first.
      */
-    private saveRectToDB(rect: StrokeRect): void {
+    private saveRectToDB(rect: QuadItem<StrokeProperties>): void {
         // structuredClone creates a deep copy and removes methods/prototypes.
-        const cleanRect = structuredClone(rect);
+        const clone = structuredClone(rect);
         // The quadtree adds a private `qtIndex` property during insertion; we must remove it before saving.
-        delete (cleanRect as any).qtIndex;
-        this.db.strokes.put(cleanRect);
+        const { qtIndex, ...rest } = clone;
+
+        this.db.strokes.put(rest);
     }
 
     public async exportDrawingData() {
@@ -159,7 +160,7 @@ export class DrawingModel {
             this.tree.clear();
             const allStrokes = await this.db.strokes.toArray();
             for (const s of allStrokes) {
-                const rect = StrokeRect(s as StrokeRectProperties);
+                const rect = getQuadItem(s as StrokeProperties);
                 this.tree.insert(rect);
             }
 

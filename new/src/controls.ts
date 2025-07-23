@@ -1,5 +1,4 @@
 // controls.ts
-import { DrawApp } from "./canvas/DEPRECATED_canvas.ignore";
 import { CanvasView } from "./canvas/CanvasView";
 import { DrawingModel } from "./DrawingData/DrawingModel";
 

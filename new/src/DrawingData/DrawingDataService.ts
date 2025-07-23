@@ -30,19 +30,25 @@ export class DrawingDataService {
 
         try {
             parsedData = JSON.parse(jsonString);
-            if (!parsedData || !Array.isArray(parsedData.strokes)) {
-                throw new Error("Invalid format: JSON must have a 'strokes' array.");
+            // Add validation for the new cards table
+            if (!parsedData || !Array.isArray(parsedData.strokes) || !Array.isArray(parsedData.textCards)) {
+                throw new Error("Invalid format: JSON must have 'strokes' and 'cards' arrays.");
             }
         } catch (e: any) {
             throw new Error(`JSON parsing or validation failed: ${e.message}`);
         }
 
         await this.db.transaction("rw", this.db.tables, async () => {
+            // This generic loop already handles clearing all tables
             for (const tableName in parsedData) {
-                const table = this.db.table(tableName);
-                await table.clear();
+                if (this.db.table(tableName)) {
+                    // Check if table exists
+                    await this.db.table(tableName).clear();
+                }
             }
+            // Bulk-add data to each table
             await this.db.strokes.bulkAdd(parsedData.strokes);
+            await this.db.textCards.bulkAdd(parsedData.textCards);
         });
 
         return parsedData;
