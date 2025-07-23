@@ -1,8 +1,8 @@
 // canvas.ts
 import { Application, Container, Graphics } from "pixi.js";
-import { Quadtree, Rectangle } from "@timohausmann/quadtree-ts";
-import Dexie, { Table } from "dexie";
+import { Rectangle } from "@timohausmann/quadtree-ts";
 import { createFractalLandmarks, updateFractalLandmarks, FractalLandmarksContext } from "./fractalLandmarks";
+import { DrawingModel } from "../DrawingData/DrawingModel";
 
 // ─── 1.  Draw init ────────────────────────────────────────────────────────────
 console.log("script loaded");
@@ -31,19 +31,12 @@ export type DrawApp = {
     app: Application;
     world: Container;
     strokeCache: Map<string, Graphics>;
-    tree: Quadtree<StrokeRect>;
+    model: DrawingModel;
     drawState: DrawState;
     fractalCtx: FractalLandmarksContext;
 };
 
-const initQuadtree = (): Quadtree<StrokeRect> => {
-    // ─── 3.  Spatial index ───────────────────────────────────────────────────────
-    const QT_BOUNDS: BBox = { x: -1e13, y: -1e13, width: 2e13, height: 2e13 };
-
-    return new Quadtree<StrokeRect>(QT_BOUNDS);
-};
-
-export async function initDraw(): Promise<DrawApp> {
+export async function initDraw(model: DrawingModel): Promise<DrawApp> {
     const app = new Application(); // ← no renderer yet!
     await app.init({ resizeTo: window, antialias: true });
 
@@ -62,7 +55,7 @@ export async function initDraw(): Promise<DrawApp> {
         world,
         strokeCache: new Map(),
         drawState: initDrawState(),
-        tree: initQuadtree(),
+        model,
         fractalCtx,
     };
 }
@@ -93,53 +86,11 @@ export type StrokeRect = Rectangle<StrokeData> & StrokeRectProperties;
 // It also adds the id to the root object which is reqired by dexie but not provided by pixi.
 export const StrokeRect = (s: StrokeRectProperties): StrokeRect => Object.assign(new Rectangle(s), { id: s.id }) as StrokeRect;
 
-export class CanvasDB extends Dexie {
-    strokes!: Table<StrokeRect, string>;
-    constructor() {
-        super("canvas");
-        this.version(1).stores({ strokes: "id" }); // primary key only
-    }
-}
-
-export const initDB = (draw: DrawApp): CanvasDB => {
-    const db = new CanvasDB();
-
-    // on startup pull strokes from IndexedDB into the quadtree
-    (async () => {
-        const all = await db.strokes.toArray();
-        for (const s of all) {
-            const rect = StrokeRect(s);
-            draw.tree.insert(rect);
-        }
-    })();
-    return db;
-};
-
-function saveRect(db: CanvasDB, rect: StrokeRect) {
-    const cleanRect = structuredClone(rect); // deep copy, no methods
-    delete (cleanRect as any).qtIndex; // remove runtime cache
-    db.strokes.put(cleanRect);
-}
-
-// Call this in the browser console to reset the canvas
-export const clearDB = () => {
-    Dexie.delete("canvas")
-        .then(() => {
-            location.reload(); // Reload page
-            console.log("IndexedDB “canvas” deleted");
-        })
-        .catch(console.error);
-};
-
-// @ts-ignore
-window.clearDB = clearDB; // us in browser inspector
-
 // ─── 4.  Camera / interaction ────────────────────────────────────────────────
 
 let zoomExp = -25; // integer power‑of‑2 exponent  … × 2^zoomExp
 let localScale = 1; // stays in [0.5, 2)
 const getZoom = () => localScale * Math.pow(2, zoomExp); // effective scale
-const getZoomInv = () => (1 / localScale) * Math.pow(2, -zoomExp); // use for precie inverse
 
 const getScaledStroke = (strokeWith: number) => (strokeWith / localScale) * Math.pow(2, -zoomExp);
 const updateZoom = (delta: number, localScale: number, zoomExp: number): { localScale: number; zoomExp: number } => {
@@ -167,7 +118,7 @@ function screenToWorld(x: number, y: number, draw: DrawApp) {
     return { x: (x - draw.world.x) * inv, y: (y - draw.world.y) * inv };
 }
 
-export function initListeners(draw: DrawApp, db: CanvasDB) {
+export function initListeners(draw: DrawApp) {
     const { world, drawState, strokeCache } = draw;
     window.addEventListener(
         "wheel",
@@ -255,27 +206,7 @@ export function initListeners(draw: DrawApp, db: CanvasDB) {
             stroke: { width: getScaledStroke(drawState.width), color: drawState.color },
         };
 
-        // bounding box (+margin)
-        const xs = drawState.pts.map((p) => p[0]);
-        const ys = drawState.pts.map((p) => p[1]);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-        const margin = getScaledStroke(drawState.width / 2);
-        const scaledWidth = getScaledStroke(drawState.width);
-        const uuid = crypto.randomUUID();
-        const rect = StrokeRect({
-            id: uuid,
-            x: minX - margin,
-            y: minY - margin,
-            width: maxX - minX + scaledWidth,
-            height: maxY - minY + scaledWidth,
-            data,
-        });
-
-        draw.tree.insert(rect);
-        saveRect(db, rect);
+        draw.model.addStroke(data);
 
         drawState.active = false;
     }
@@ -329,7 +260,18 @@ function getViewRectWithMargin(app: Application, world: Container, marginWorld: 
 }
 
 export function renderLoop(draw: DrawApp) {
-    const { app, world, strokeCache } = draw;
+    const { app, world, strokeCache, model } = draw;
+
+    // Currently this does nothing, come back to it.
+    model.store.subscribe(
+        (state) => state.revision,
+        (revision) => {
+            // Optional: for non-continuous rendering, you would call app.render() here.
+            // Since we use a ticker, this just ensures we get the latest data on the next frame.
+            // console.log("Model updated, view will re-render.");
+        }
+    );
+
     app.ticker.add(() => {
         // const viewWithMargin = getViewRectWithMargin(app, world, 512);
 
@@ -344,8 +286,7 @@ export function renderLoop(draw: DrawApp) {
             height: viewH,
         });
 
-        // This is the key step that uses the quad tree to determine which strokes are visible.
-        const visible = draw.tree.retrieve(viewRect);
+        const visible = model.getVisibleStrokes(viewRect);
 
         // hide everything, then show only visible
         strokeCache.forEach((g, id) => {

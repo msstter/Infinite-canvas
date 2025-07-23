@@ -1,0 +1,178 @@
+// drawingModel.ts
+import { Quadtree, Rectangle } from "@timohausmann/quadtree-ts";
+import { createStore, StoreApi } from "zustand/vanilla";
+import { subscribeWithSelector } from "zustand/middleware";
+import { StrokeData, StrokeRect, BBox, StrokeRectProperties } from "../canvas/canvas"; // Assuming types are exported from canvas.ts
+import { DrawingDB } from "./DrawingDB";
+import { DrawingDataService } from "./DrawingDataService";
+
+// ─── 1.  Zustand Store Definition ─────────────────────────────────────────────
+
+type DrawingModelState = {
+    /** A simple counter that increments whenever the drawing data changes. Views subscribe to this to know when to re-render. */
+    revision: number;
+    /** A flag to indicate that the initial data has been loaded from the database. */
+    initialized: boolean;
+};
+
+type DrawingModelActions = {
+    incrementRevision: () => void;
+    setInitialized: (value: boolean) => void;
+};
+
+// This is the full type for our vanilla Zustand store
+type DrawingStore = StoreApi<DrawingModelState & DrawingModelActions>;
+
+const createDrawingModelStore = () => {
+    return createStore<DrawingModelState & DrawingModelActions>()(
+        subscribeWithSelector((set) => ({
+            revision: 0,
+            initialized: false,
+            // Internal action to notify subscribers of a change.
+            incrementRevision: () => set((state) => ({ revision: state.revision + 1 })),
+            // Internal action to signal that loading is complete.
+            setInitialized: (value) => set({ initialized: value }),
+        }))
+    );
+};
+
+// ─── 2.  Drawing Model Class ──────────────────────────────────────────────────
+
+export class DrawingModel {
+    /** The single source of truth for all stroke geometry, spatially indexed. */
+    private tree: Quadtree<StrokeRect>;
+
+    /** The database instance for persisting strokes. */
+    private db: DrawingDB;
+    private dataService: DrawingDataService;
+
+    /** The Zustand store for state management and notifications. Views will subscribe to this. */
+    public store: ReturnType<typeof createDrawingModelStore>;
+
+    constructor() {
+        this.tree = this.initQuadtree();
+        this.db = new DrawingDB();
+        this.dataService = new DrawingDataService(this.db);
+
+        // Create the vanilla Zustand store. This will be the heart of our observer pattern.
+        this.store = createDrawingModelStore();
+    }
+
+    /**
+     * Initializes the model by loading all strokes from IndexedDB into the quadtree.
+     * This must be called once after the model is created.
+     */
+    public async init(): Promise<void> {
+        try {
+            const allStrokes = await this.db.strokes.toArray();
+            for (const s of allStrokes) {
+                // The data from Dexie is a plain object, so we recreate the StrokeRect instance.
+                const rect = StrokeRect(s as StrokeRectProperties);
+                this.tree.insert(rect);
+            }
+            console.log(`DrawingModel: Initialized with ${allStrokes.length} strokes from DB.`);
+        } catch (error) {
+            console.error("DrawingModel: Failed to initialize from database.", error);
+        } finally {
+            // Signal that initialization is complete and trigger an initial render.
+            this.store.getState().setInitialized(true);
+            this.store.getState().incrementRevision();
+        }
+    }
+
+    /**
+     * Creates a new stroke, adds it to the quadtree, saves it to the database,
+     * and notifies all subscribed views of the change.
+     * @param data The raw data for the new stroke (points, width, color).
+     */
+    public addStroke(data: StrokeData): void {
+        // Calculate the bounding box for the new stroke
+        const xs = data.pts.map((p) => p[0]);
+        const ys = data.pts.map((p) => p[1]);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+
+        // Add a margin around the bounding box based on the stroke width
+        const margin = data.stroke.width / 2;
+
+        const rect = StrokeRect({
+            id: crypto.randomUUID(),
+            x: minX - margin,
+            y: minY - margin,
+            width: maxX - minX + data.stroke.width,
+            height: maxY - minY + data.stroke.width,
+            data,
+        });
+
+        // Update state
+        this.tree.insert(rect);
+        this.saveRectToDB(rect);
+
+        // Notify all subscribers that data has changed by incrementing the revision.
+        this.store.getState().incrementRevision();
+    }
+
+    /**
+     * Retrieves all strokes that intersect with the given bounding box.
+     * This is the primary method used by views to get the data they need to render.
+     * @param bounds The visible area of a canvas.
+     * @returns An array of StrokeRect objects.
+     */
+    public getVisibleStrokes(bounds: BBox): StrokeRect[] {
+        // The quadtree library's retrieve method is highly efficient.
+        return this.tree.retrieve(new Rectangle(bounds));
+    }
+
+    /**
+     * Private helper to initialize the quadtree with vast bounds.
+     */
+    private initQuadtree(): Quadtree<StrokeRect> {
+        const QT_BOUNDS: BBox = { x: -1e13, y: -1e13, width: 2e13, height: 2e13 };
+        return new Quadtree<StrokeRect>(QT_BOUNDS);
+    }
+
+    /**
+     * Private helper to save a stroke to the database, cleaning it first.
+     */
+    private saveRectToDB(rect: StrokeRect): void {
+        // structuredClone creates a deep copy and removes methods/prototypes.
+        const cleanRect = structuredClone(rect);
+        // The quadtree adds a private `qtIndex` property during insertion; we must remove it before saving.
+        delete (cleanRect as any).qtIndex;
+        this.db.strokes.put(cleanRect);
+    }
+
+    public async exportDrawingData() {
+        return await this.dataService.exportDrawingToJson();
+    }
+    public async loadFromFile(file: File): Promise<void> {
+        try {
+            const jsonContent = await file.text();
+
+            // 1. Delegate DB update to the service
+            await this.dataService.importFromJson(jsonContent);
+
+            // 2. Manually rebuild the in-memory state (quadtree)
+            console.log("Rebuilding quadtree from newly imported data...");
+            this.tree.clear();
+            const allStrokes = await this.db.strokes.toArray();
+            for (const s of allStrokes) {
+                const rect = StrokeRect(s as StrokeRectProperties);
+                this.tree.insert(rect);
+            }
+
+            // 3. Notify all views of the major change
+            this.store.getState().incrementRevision();
+            console.log(`Successfully loaded and rebuilt drawing from file: ${file.name}`);
+        } catch (error) {
+            console.error(`Failed to load drawing from file ${file.name}:`, error);
+            throw error; // Re-throw for the UI to handle
+        }
+    }
+    clearDrawing() {
+        this.db.clearDB();
+        location.reload(); // UI side-effect is ok in a static utility method like this.
+    }
+}

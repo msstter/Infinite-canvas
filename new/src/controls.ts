@@ -1,27 +1,44 @@
 // controls.ts
-import { CanvasDB, clearDB, DrawApp } from "./canvas/canvas";
-import { exportCanvas, importCanvas } from "./exportLoad";
-const addClear = () => {
+import { DrawApp } from "./canvas/canvas";
+
+const addClear = (draw: DrawApp) => {
     const btn = document.querySelector(".clear-btn");
     if (!btn) return;
 
     btn.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        clearDB();
+        draw.model.clearDrawing();
     });
 };
 
-const addExport = (db: CanvasDB) => {
+// Save provides functionality to load the user's data from a json file.
+export async function exportFile(json: string) {
+    // // 3.  Turn into a Blob and trigger download
+    const blob = new Blob([json], {
+        type: "application/json",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "endless-canvas.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    a.remove();
+}
+const addExport = (draw: DrawApp) => {
     const btn = document.querySelector(".export-btn");
     if (!btn) return;
 
     btn.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        exportCanvas(db);
+        draw.model.exportDrawingData().then((json) => {
+            exportFile(json);
+        });
     });
 };
 
-const addImport = (draw: DrawApp, db: CanvasDB) => {
+const addImport = (draw: DrawApp) => {
     const btn = document.querySelector(".import-btn");
     const input = document.getElementById("upload-file") as HTMLInputElement | null;
     if (!btn || !input) return;
@@ -40,17 +57,17 @@ const addImport = (draw: DrawApp, db: CanvasDB) => {
             const files = this.files;
             if (!files || files.length == 0) return;
             const json: File = files[0];
-            await importCanvas(json, draw, db);
+            await draw.model.loadFromFile(json);
             draw.drawState.frozen = false;
         },
         false
     );
 };
 
-export const initControlListeners = (draw: DrawApp, db: CanvasDB) => {
-    addClear();
-    addExport(db);
-    addImport(draw, db);
+export const initControlListeners = (draw: DrawApp) => {
+    addClear(draw);
+    addExport(draw);
+    addImport(draw);
 };
 
 // Adds event listeners for controls.

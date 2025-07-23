@@ -1,14 +1,16 @@
 // app.ts
-import { initDB, initListeners, initDraw, renderLoop } from "./canvas/canvas";
+import { DrawingModel } from "./DrawingData/DrawingModel";
+import { initListeners, initDraw, renderLoop } from "./canvas/canvas";
 import { initControlListeners } from "./controls";
 import { initPalletButtons } from "./pallet/initPallet";
 
 function initApp() {
-    initDraw().then((draw) => {
-        const db = initDB(draw);
-        initListeners(draw, db);
+    const model = new DrawingModel();
+
+    initDraw(model).then((draw) => {
+        initListeners(draw);
         renderLoop(draw);
-        initControlListeners(draw, db);
+        initControlListeners(draw);
         initPalletButtons(draw);
     });
 }
