@@ -1,7 +1,7 @@
 // DrawingDB.ts
 
 import Dexie, { Table } from "dexie";
-import { StrokeRect } from "../canvas/canvas";
+import { StrokeRect } from "../canvas/DEPRECATED_canvas.ignore";
 
 // The keys are tables, with arrays of the rows.
 export type DrawingDataSchema = { strokes: StrokeRect[] };

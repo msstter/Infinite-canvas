@@ -1,5 +1,4 @@
 import { ActiveTool, activeToolKey, singleSubscribe, appStore } from "../appState";
-import { DrawApp } from "../canvas/canvas";
 
 const getToolDataAttr = (el: HTMLElement): ActiveTool => {
     const tool = el.getAttribute("data-tool");
@@ -11,7 +10,7 @@ const getToolDataAttr = (el: HTMLElement): ActiveTool => {
     }
 };
 
-export function initPalletButtons(draw: DrawApp) {
+export function initPalletButtons() {
     const palletButtons = document.querySelectorAll(".pallet-btn") as NodeListOf<HTMLButtonElement>;
 
     // Handle updating based on active tool change in a single place.

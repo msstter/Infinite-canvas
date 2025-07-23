@@ -1,13 +1,15 @@
 // controls.ts
-import { DrawApp } from "./canvas/canvas";
+import { DrawApp } from "./canvas/DEPRECATED_canvas.ignore";
+import { CanvasView } from "./canvas/CanvasView";
+import { DrawingModel } from "./DrawingData/DrawingModel";
 
-const addClear = (draw: DrawApp) => {
+const addClear = (model: DrawingModel) => {
     const btn = document.querySelector(".clear-btn");
     if (!btn) return;
 
     btn.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        draw.model.clearDrawing();
+        model.clearDrawing();
     });
 };
 
@@ -26,19 +28,19 @@ export async function exportFile(json: string) {
     URL.revokeObjectURL(url);
     a.remove();
 }
-const addExport = (draw: DrawApp) => {
+const addExport = (model: DrawingModel) => {
     const btn = document.querySelector(".export-btn");
     if (!btn) return;
 
     btn.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        draw.model.exportDrawingData().then((json) => {
+        model.exportDrawingData().then((json) => {
             exportFile(json);
         });
     });
 };
 
-const addImport = (draw: DrawApp) => {
+const addImport = (model: DrawingModel, mainCanvasView: CanvasView) => {
     const btn = document.querySelector(".import-btn");
     const input = document.getElementById("upload-file") as HTMLInputElement | null;
     if (!btn || !input) return;
@@ -52,22 +54,22 @@ const addImport = (draw: DrawApp) => {
         "change",
         async function (e) {
             // Pause drawing to avoid accidental click
-            draw.drawState.frozen = true;
-            draw.drawState.active = false;
+            mainCanvasView.drawState.frozen = true;
+            mainCanvasView.drawState.active = false;
             const files = this.files;
             if (!files || files.length == 0) return;
             const json: File = files[0];
-            await draw.model.loadFromFile(json);
-            draw.drawState.frozen = false;
+            await model.loadFromFile(json);
+            mainCanvasView.drawState.frozen = false;
         },
         false
     );
 };
 
-export const initControlListeners = (draw: DrawApp) => {
-    addClear(draw);
-    addExport(draw);
-    addImport(draw);
+export const initControlListeners = (model: DrawingModel, mainCanvasView: CanvasView) => {
+    addClear(model);
+    addExport(model);
+    addImport(model, mainCanvasView);
 };
 
 // Adds event listeners for controls.

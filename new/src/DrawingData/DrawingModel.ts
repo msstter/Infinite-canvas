@@ -2,7 +2,7 @@
 import { Quadtree, Rectangle } from "@timohausmann/quadtree-ts";
 import { createStore, StoreApi } from "zustand/vanilla";
 import { subscribeWithSelector } from "zustand/middleware";
-import { StrokeData, StrokeRect, BBox, StrokeRectProperties } from "../canvas/canvas"; // Assuming types are exported from canvas.ts
+import { StrokeData, StrokeRect, BBox, StrokeRectProperties } from "../canvas/DEPRECATED_canvas.ignore"; // Assuming types are exported from canvas.ts
 import { DrawingDB } from "./DrawingDB";
 import { DrawingDataService } from "./DrawingDataService";
 

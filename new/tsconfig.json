@@ -10,6 +10,7 @@
         "target": "ES2022", // ES2022‑level syntax and libs
         "module": "ESNext", // preserve native ESM imports
         "moduleResolution": "bundler",
+        "noEmit": true,
 
         // --- project structure ---
         "rootDir": "./src",
