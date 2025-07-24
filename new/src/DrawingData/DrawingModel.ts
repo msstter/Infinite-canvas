@@ -13,11 +13,14 @@ type DrawingModelState = {
     revision: number;
     /** A flag to indicate that the initial data has been loaded from the database. */
     initialized: boolean;
+    textCards: { [id: string]: QuadItem<TextCardProperties> };
 };
 
 type DrawingModelActions = {
     incrementRevision: () => void;
     setInitialized: (value: boolean) => void;
+    putCard: (card: QuadItem<TextCardProperties>) => void;
+    deleteCard: (id: string) => void;
 };
 
 // This is the full type for our vanilla Zustand store
@@ -28,10 +31,27 @@ const createDrawingModelStore = () => {
         subscribeWithSelector((set) => ({
             revision: 0,
             initialized: false,
+            textCards: {},
             // Internal action to notify subscribers of a change.
             incrementRevision: () => set((state) => ({ revision: state.revision + 1 })),
             // Internal action to signal that loading is complete.
             setInitialized: (value) => set({ initialized: value }),
+            putCard: (card: QuadItem<TextCardProperties>) =>
+                set((state) => {
+                    state.incrementRevision();
+                    return { textCards: { ...state.textCards, card } };
+                }),
+            deleteCard: (id: string) =>
+                set((state) => {
+                    const newCards = { ...state.textCards };
+                    if (id in newCards) {
+                        delete newCards[id];
+                        state.incrementRevision();
+                        return newCards;
+                    } else {
+                        return state.textCards;
+                    }
+                }),
         }))
     );
 };
@@ -56,6 +76,7 @@ export class DrawingModel {
 
         // Create the vanilla Zustand store. This will be the heart of our observer pattern.
         this.store = createDrawingModelStore();
+        this.init();
     }
 
     /**
@@ -69,8 +90,13 @@ export class DrawingModel {
                 this.db.textCards.toArray(), // NEW
             ]);
 
-            for (const s of [...allStrokes, ...allCards]) {
-                this.tree.insert(getQuadItem(s as any)); // 'any' because this function is generic
+            for (const s of allStrokes) {
+                this.tree.insert(getQuadItem(s));
+            }
+            for (const c of allCards) {
+                const item = getQuadItem(c);
+                this.tree.insert(item);
+                this.store.getState().putCard(item);
             }
             console.log(`DrawingModel: Initialized with ${allStrokes.length} strokes ` + `and ${allCards.length} text cards from DB.`);
         } catch (err) {
@@ -165,7 +191,7 @@ export class DrawingModel {
         await this.saveItemToDB(card);
 
         // 3️⃣  notify views
-        this.store.getState().incrementRevision();
+        this.store.getState().putCard(card);
     }
 
     /**
@@ -184,17 +210,18 @@ export class DrawingModel {
             await this.db.textCards.put(rest);
         }
     }
-    public addTextCard(rect: QuadItem<TextCardProperties>): void {
-        this.tree.insert(rect);
-        this.saveItemToDB(rect);
-        this.store.getState().incrementRevision();
+    public addTextCard(card: QuadItem<TextCardProperties>): void {
+        this.tree.insert(card);
+        this.saveItemToDB(card);
+        this.store.getState().putCard(card);
     }
     async deleteTextCard(id: string): Promise<void> {
         const card = await this.getTextCardById(id);
         if (!card) return;
         this.tree.remove(card);
         await this.db.textCards.delete(card.id);
-        this.store.getState().incrementRevision();
+        console.log("card is deleted from db");
+        this.store.getState().deleteCard(id);
     }
 
     public async exportDrawingData() {

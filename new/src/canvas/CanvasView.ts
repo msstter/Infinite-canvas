@@ -59,7 +59,6 @@ export class CanvasView {
 
     overlay: NotecardOverlay | null = null;
     // --- Interaction State ---
-    // TODO: Maybe this should be made private in the future.
     drawState: DrawState;
 
     constructor(targetElement: HTMLElement, model: DrawingModel, options: Partial<CanvasViewOptions> = {}) {
@@ -98,6 +97,8 @@ export class CanvasView {
         this.world.scale.set(this.getZoom());
 
         this._initListeners(options);
+        this.overlay = new NotecardOverlay(this);
+        this.overlay.init();
         this._startRenderLoop();
 
         // When activeTool appState is updated, set the tool active in every canvas. Note this means that different tools cannot be active in different canvases. For now that's the behaivior we want.
@@ -105,8 +106,6 @@ export class CanvasView {
             (s) => s.activeTool,
             (tool) => getCanvasTool(this, tool) // Note that sub-canvases will have empty tools (no pointer events)
         );
-
-        this.overlay = new NotecardOverlay(this);
     }
 
     getZoomObj(): Zoom {
@@ -167,7 +166,7 @@ export class CanvasView {
     private _startRenderLoop(): void {
         this.app.ticker.add(() => {
             this.overlay?.beginFrame();
-            const viewRect = this._getViewRect();
+            const viewRect = this.getViewRect();
 
             // Update background landmarks
             updateFractalLandmarks(this.fractalCtx, viewRect, this.getZoom());
@@ -192,7 +191,7 @@ export class CanvasView {
                     this.drawStroke(g, item, this.getZoom());
                     g.visible = true;
                 } else if (isTextCard(item) && this.overlay) {
-                    this.overlay.sync(item);
+                    this.overlay.syncPosition(item);
                 }
             }
             this.overlay?.endFrame();
@@ -228,7 +227,7 @@ export class CanvasView {
         return { x: (x - this.world.x) * inv, y: (y - this.world.y) * inv };
     }
 
-    private _getViewRect(): BBox {
+    getViewRect(): BBox {
         const z = this.getZoom();
         return {
             x: -this.world.x / z,

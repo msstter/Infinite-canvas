@@ -10,7 +10,7 @@ export const blockDrawingEvent = (target: HTMLElement, mainCanvas: boolean) => {
     } else {
         result = false;
     }
-    console.log("block drawing in", result, target);
+
     return result;
 };
 
