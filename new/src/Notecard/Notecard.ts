@@ -3,10 +3,11 @@
 export class Notecard {
     private element: HTMLDivElement;
     private topBar: HTMLDivElement;
-    private titleSpan: HTMLSpanElement; // Now a separate property to access
-    private contentArea: HTMLDivElement; // Changed from HTMLTextAreaElement to HTMLDivElement
+    private titleSpan: HTMLSpanElement;
+    private contentArea: HTMLDivElement; // Declared here
+    private deleteButton: HTMLButtonElement; 
 
-    constructor(x: number, y: number, width: number = 300, height: number = 200) {
+    constructor(x: number, y: number, width: number = 300, height: number = 200, onDelete: (notecard: Notecard) => void = ()=> {}) {
         this.element = document.createElement("div");
         this.element.classList.add("notecard");
         this.element.style.left = `${x}px`;
@@ -21,23 +22,50 @@ export class Notecard {
         // Editable Title
         this.titleSpan = document.createElement("span");
         this.titleSpan.classList.add("notecard-title");
-        this.titleSpan.contentEditable = "true"; // Make it editable
+        this.titleSpan.contentEditable = "true";
         this.titleSpan.textContent = "New Notecard";
-        this.titleSpan.spellcheck = false; // Disable spellcheck for titles
+        this.titleSpan.spellcheck = false;
         this.topBar.appendChild(this.titleSpan);
 
         // Prevent new lines in title
         this.titleSpan.addEventListener("keypress", (e: KeyboardEvent) => {
             if (e.key === "Enter") {
-                e.preventDefault(); // Prevent new line on Enter
-                this.titleSpan.blur(); // Remove focus
+                e.preventDefault();
+                this.titleSpan.blur();
             }
         });
 
         // Add a placeholder for interactive elements (e.g., font controls)
         const controlsContainer = document.createElement("div");
         controlsContainer.classList.add("notecard-controls");
-        this.topBar.appendChild(controlsContainer);
+        // controlsContainer will be appended later within the topBar, after title and before delete button
+
+        // Delete Button
+        this.deleteButton = document.createElement("button");
+        this.deleteButton.classList.add("notecard-delete-button");
+        this.deleteButton.textContent = "X";
+        this.deleteButton.title = "Delete Notecard";
+        this.deleteButton.addEventListener("click", () => {
+            if (onDelete) {
+                onDelete(this);
+            }
+            this.element.remove();
+        });
+        this.topBar.appendChild(this.deleteButton); // Append delete button to the topBar
+
+        // --- IMPORTANT: CONTENT AREA INITIALIZATION MUST BE HERE ---
+        // Content Area (now contentEditable div)
+        this.contentArea = document.createElement("div");
+        this.contentArea.classList.add("notecard-content");
+        this.contentArea.contentEditable = "true";
+        this.contentArea.setAttribute("data-placeholder", "Start typing here...");
+        this.element.appendChild(this.contentArea); // Appended to the main notecard element
+
+        // Now append controlsContainer to topBar - this is logically where it fits
+        // The order here (title, controlsContainer, deleteButton) will be laid out by flexbox.
+        // Inserting it before the delete button using insertBefore is precise.
+        this.topBar.insertBefore(controlsContainer, this.deleteButton);
+
 
         // Font Family Selector
         const fontSelect = document.createElement("select");
@@ -51,18 +79,18 @@ export class Notecard {
         });
         fontSelect.addEventListener("change", (e) => {
             document.execCommand("fontName", false, (e.target as HTMLSelectElement).value);
-            this.contentArea.focus(); // Keep focus on content area
+            this.contentArea.focus();
         });
         controlsContainer.appendChild(fontSelect);
 
         // Font Size Selector
         const sizeSelect = document.createElement("select");
         sizeSelect.classList.add("notecard-size-select");
-        const sizes = ["1", "2", "3", "4", "5", "6", "7"]; // Corresponds to font sizes 1-7 in execCommand
+        const sizes = ["1", "2", "3", "4", "5", "6", "7"];
         sizes.forEach((size) => {
             const option = document.createElement("option");
             option.value = size;
-            option.textContent = `${parseInt(size) * 3 + 10}px`; // Approximate px value for display
+            option.textContent = `${parseInt(size) * 3 + 10}px`;
             sizeSelect.appendChild(option);
         });
         sizeSelect.addEventListener("change", (e) => {
@@ -75,21 +103,31 @@ export class Notecard {
         const colorInput = document.createElement("input");
         colorInput.type = "color";
         colorInput.classList.add("notecard-color-input");
-        colorInput.value = "#333333"; // Default text color
+        colorInput.value = "#333333";
         colorInput.addEventListener("input", (e) => {
             document.execCommand("foreColor", false, (e.target as HTMLInputElement).value);
             this.contentArea.focus();
         });
         controlsContainer.appendChild(colorInput);
 
-        // Typographical Emphasis Buttons
+        // Typographical Emphasis Buttons - this function is now safe to call
         const createEmphasisButton = (command: string, text: string) => {
             const button = document.createElement("button");
             button.classList.add("notecard-emphasis-button");
             button.textContent = text;
+
+            // This line should now work correctly because this.contentArea is defined
+            this.contentArea.addEventListener("selectionchange", () => {
+                if (document.queryCommandState(command)) {
+                    button.classList.add("active-style");
+                } else {
+                    button.classList.remove("active-style");
+                }
+            });
+
             button.addEventListener("click", () => {
                 document.execCommand(command, false);
-                this.contentArea.focus(); // Keep focus on content area
+                this.contentArea.focus();
             });
             return button;
         };
@@ -99,27 +137,21 @@ export class Notecard {
         controlsContainer.appendChild(createEmphasisButton("underline", "U"));
         controlsContainer.appendChild(createEmphasisButton("strikeThrough", "S"));
 
-        // Content Area (now contentEditable div)
-        this.contentArea = document.createElement("div"); // Changed to div
-        this.contentArea.classList.add("notecard-content");
-        this.contentArea.contentEditable = "true"; // Make it editable
-        this.contentArea.setAttribute("data-placeholder", "Start typing here..."); // For CSS placeholder
-        this.element.appendChild(this.contentArea);
-
         // Add event listeners for basic dragging
         this.makeDraggable();
     }
 
+    // ... (rest of the Notecard class methods)
     public getElement(): HTMLDivElement {
         return this.element;
     }
 
     public getContent(): string {
-        return this.contentArea.innerHTML; // Use innerHTML for rich text
+        return this.contentArea.innerHTML;
     }
 
     public setContent(html: string): void {
-        this.contentArea.innerHTML = html; // Use innerHTML for rich text
+        this.contentArea.innerHTML = html;
     }
 
     public getTitle(): string {
@@ -134,17 +166,15 @@ export class Notecard {
         let isDragging = false;
         let offsetX: number, offsetY: number;
 
-        // Use topBar for dragging
         this.topBar.addEventListener("mousedown", (e: MouseEvent) => {
-            if (e.target === this.titleSpan || (e.target as HTMLElement).closest(".notecard-controls")) {
-                // Don't drag if clicking directly on title or controls
+            if (e.target === this.titleSpan || (e.target as HTMLElement).closest(".notecard-controls") || e.target === this.deleteButton) {
                 return;
             }
             isDragging = true;
             offsetX = e.clientX - this.element.getBoundingClientRect().left;
             offsetY = e.clientY - this.element.getBoundingClientRect().top;
             this.element.style.cursor = "grabbing";
-            this.element.style.zIndex = "1000"; // Bring to front
+            this.element.style.zIndex = "1000";
         });
 
         document.addEventListener("mousemove", (e: MouseEvent) => {
@@ -160,12 +190,10 @@ export class Notecard {
         document.addEventListener("mouseup", () => {
             isDragging = false;
             this.element.style.cursor = "grab";
-            this.element.style.zIndex = "auto"; // Reset z-index
+            this.element.style.zIndex = "auto";
         });
     }
 }
 
-export function initNotecard() {
-    const card = new Notecard(20, 20, 508, 304);
-    document.body.appendChild(card.getElement());
-}
+// export function initNotecard() is likely no longer used directly in app.ts
+// if NotecardOverlay is managing card creation.

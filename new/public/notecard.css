@@ -81,14 +81,17 @@
     align-items: center;
     flex-wrap: wrap;
     /* Allow controls to wrap */
-    margin-left: auto;
-    /* Push controls to the right */
+    /* margin-left: auto; */ /* Removed as the delete button will handle its own margin-left: auto */
+    /* If you want controls to be on the right of the title and the delete button further right,
+       you can add `margin-left: auto;` to the delete button directly and remove it from controls.
+       Your current CSS already has it on controls. If the delete button pushes it left,
+       you might need to re-evaluate the flexbox for the top-bar.
+       Let's stick to the current setup where controls are right of title, and delete is right of controls. */
 }
 
 .notecard-font-select,
 .notecard-size-select,
-.notecard-color-input,
-.notecard-emphasis-button {
+.notecard-emphasis-button { /* Group these as they share similar hover/active styles */
     background-color: #e0e0b0;
     border: 1px solid #999;
     color: #333;
@@ -97,15 +100,31 @@
     padding: 3px 6px;
     border-radius: 3px;
     cursor: pointer;
-    transition: background-color 0.1s ease;
+    transition: background-color 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease; /* Smooth transitions */
+    outline: none; /* Remove default focus outline for custom styling */
 }
 
+/* Hover state for selects and emphasis buttons */
 .notecard-font-select:hover,
 .notecard-size-select:hover,
 .notecard-emphasis-button:hover {
-    background-color: #d0d0a0;
+    background-color: #d0d0a0; /* Slightly darker */
+    border-color: #777; /* Darker border */
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.2); /* Subtle shadow on hover */
 }
 
+/* Focus/Active state for selects and emphasis buttons */
+.notecard-font-select:focus,
+.notecard-size-select:focus,
+.notecard-emphasis-button:active,
+.notecard-emphasis-button.active-style { /* .active-style for commands that toggle, like bold */
+    background-color: #c0c090; /* Even darker, more distinct */
+    border-color: #555; /* Even darker border */
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3); /* Inset shadow for "pressed" look */
+    color: #000; /* Darker text for active state */
+}
+
+/* Specific styles for .notecard-color-input */
 .notecard-color-input {
     width: 30px;
     /* Smaller width for color picker */
@@ -118,6 +137,8 @@
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+    transition: border-color 0.1s ease, box-shadow 0.1s ease; /* Smooth transitions */
+    outline: none; /* Remove default focus outline */
 }
 
 .notecard-color-input::-webkit-color-swatch-wrapper {
@@ -129,12 +150,51 @@
     border-radius: 2px;
 }
 
+/* Hover state for color input */
+.notecard-color-input:hover {
+    border-color: #777; /* Darker border on hover */
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.2); /* Subtle shadow on hover */
+}
+
+/* Focus state for color input */
+.notecard-color-input:focus {
+    border-color: #555; /* Even darker border on focus */
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3); /* More pronounced shadow on focus */
+}
+
 .notecard-emphasis-button {
     min-width: 25px;
-    /* Fixed width for emphasis buttons */
     text-align: center;
     font-weight: bold;
-    /* Make the button text bold */
+}
+
+/* Delete Button (Keep this from the previous update) */
+.notecard-delete-button {
+    background-color: #ff4d4d;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    width: 20px;
+    height: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-left: auto; /* Pushes the button to the far right */
+    flex-shrink: 0;
+    margin-left: 5px; /* Space between controls and delete */
+    transition: background-color 0.1s ease, transform 0.1s ease; /* Add transform for a subtle click effect */
+}
+
+.notecard-delete-button:hover {
+    background-color: #cc0000;
+}
+
+.notecard-delete-button:active {
+    background-color: #990000; /* Even darker when clicked */
+    transform: translateY(1px); /* Subtle press down effect */
 }
 
 /* Notecard Content Area (now contentEditable div) */
