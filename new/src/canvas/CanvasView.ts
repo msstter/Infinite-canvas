@@ -2,7 +2,10 @@
 import { Application, Container, Graphics, Rectangle, ApplicationOptions } from "pixi.js";
 import { DrawingModel } from "../DrawingData/DrawingModel";
 import { createFractalLandmarks, updateFractalLandmarks, FractalLandmarksContext } from "./fractalLandmarks";
-import { StrokeData, BBox, StrokeProperties, CanvasViewOptions, QuadItem, getQuadItem, isStroke } from "./types";
+import { StrokeData, BBox, StrokeProperties, CanvasViewOptions, QuadItem, getQuadItem, isStroke, Zoom, CanvasTool } from "./types";
+import { ActiveTool, appStore } from "../appState";
+import { TextCardTool } from "./TextCardTool";
+import { blockDrawingEvent, DrawTool } from "./DrawTool";
 
 type DrawState = {
     frozen: boolean;
@@ -38,31 +41,19 @@ const getPixiOptions = (targetElement: HTMLElement, options: Partial<CanvasViewO
     return pixiOptions;
 };
 
-const blockDrawingEvent = (target: HTMLElement, mainCanvas: boolean) => {
-    // If the target is in a parent that is a button, notecard, or sub-canvas
-    let result: boolean;
-    if (mainCanvas) {
-        result = !!target.closest("button,.notecard,.sub-canvas");
-    } else {
-        result = false;
-    }
-    console.log("block drawing in", result, target);
-    return result;
-};
-
 export class CanvasView {
     // --- Public Properties ---
     public readonly app: Application;
     public readonly model: DrawingModel;
-
-    // --- Private View-Specific State ---
-    private readonly world: Container;
-    private readonly strokeCache: Map<string, Graphics>;
-    private readonly fractalCtx: FractalLandmarksContext;
+    canvasTool: CanvasTool;
+    options: Partial<CanvasViewOptions>;
+    readonly world: Container;
+    readonly strokeCache: Map<string, Graphics>;
+    readonly fractalCtx: FractalLandmarksContext;
 
     // --- Private Camera State ---
-    private zoomExp = -25;
-    private localScale = 1;
+    private zoomExp: number = -25;
+    private localScale: number = 1;
 
     // --- Interaction State ---
     // TODO: Maybe this should be made private in the future.
@@ -71,10 +62,11 @@ export class CanvasView {
     constructor(targetElement: HTMLElement, model: DrawingModel, options: Partial<CanvasViewOptions> = {}) {
         this.app = new Application();
         this.model = model;
+        this.options = options;
         this.world = new Container();
         this.strokeCache = new Map();
         this.fractalCtx = createFractalLandmarks(12345); // optional seed
-
+        this.canvasTool = new DrawTool(this);
         this.drawState = {
             frozen: false,
             active: false,
@@ -100,23 +92,29 @@ export class CanvasView {
 
         this.app.stage.addChild(this.world);
         this.world.addChildAt(this.fractalCtx.container, 0); // background under strokes
-        this.world.scale.set(this._getZoom());
+        this.world.scale.set(this.getZoom());
 
         this._initListeners(options);
         this._startRenderLoop();
 
-        // Subscribe this view to the shared model's updates
-        // this.model.store.subscribe(
-        //     (state) => state.revision,
-        //     () => {
-        //         // When the model changes, the render loop will automatically pick it up.
-        //         // For a non-continuous render loop, you would manually trigger a render here.
-        //         // e.g., this.app.render();
-        //         console.log("View received update from model. A re-render will occur.");
-        //     }
-        // );
+        this.setActiveTool = this.setActiveTool.bind(this); // Bind method for callback
+        // When activeTool appState is updated, set the tool active in every canvas. Note this means that different tools cannot be active in different canvases. For now that's the behaivior we want.
+        appStore.subscribe((s) => s.activeTool, this.setActiveTool);
     }
 
+    setActiveTool(tool: ActiveTool): void {
+        if (tool === "draw") {
+            this.canvasTool = new DrawTool(this);
+        } else if (tool === "notecard") {
+            this.canvasTool = new TextCardTool(this);
+        } else {
+            // For now we default to draw tool
+            this.canvasTool = new DrawTool(this);
+        }
+    }
+    getZoomObj(): Zoom {
+        return { zoomExp: this.zoomExp, localScale: this.localScale };
+    }
     /** Attaches all event listeners for this specific canvas view. */
     private _initListeners(options: Partial<CanvasViewOptions>): void {
         const canvas: HTMLElement = options.mainCanvas ? document.body : this.app.canvas;
@@ -128,11 +126,11 @@ export class CanvasView {
                 if (options.mainCanvas === false) e.stopPropagation();
                 if (this.drawState.frozen) return;
                 if (e.target && blockDrawingEvent(e.target as HTMLElement, options.mainCanvas ?? false)) return;
-                const localCoords = this._getLocalCoordsFromEvent(e);
-                const worldPoint = this._screenToWorld(localCoords.x, localCoords.y);
+                const localCoords = this.getLocalCoordsFromEvent(e);
+                const worldPoint = this.screenToWorld(localCoords.x, localCoords.y);
 
                 this._updateZoom(e.deltaY);
-                const newZoom = this._getZoom();
+                const newZoom = this.getZoom();
 
                 this.world.scale.set(newZoom);
                 this.world.x = e.clientX - worldPoint.x * newZoom;
@@ -142,87 +140,30 @@ export class CanvasView {
         );
 
         canvas.addEventListener("pointerdown", (e) => {
-            if (options.mainCanvas === false) e.stopPropagation();
-            if (this.drawState.frozen || (e.button !== 0 && e.pointerType === "mouse")) return;
-            if (e.target && blockDrawingEvent(e.target as HTMLElement, options.mainCanvas ?? false)) return;
+            this.canvasTool.pointerDown(e);
 
-            this.drawState.active = true;
-            this.drawState.pointerID = e.pointerId;
-            this.drawState.pts = [];
-            const localCoords = this._getLocalCoordsFromEvent(e);
-            const worldPoint = this._screenToWorld(localCoords.x, localCoords.y);
-
-            this.drawState.pts.push([worldPoint.x, worldPoint.y]);
-
-            this.drawState.g = new Graphics();
-            this.strokeCache.set("temp", this.drawState.g);
-            this.world.addChild(this.drawState.g);
-
-            canvas.setPointerCapture(e.pointerId);
+            // Move all these to DrawTool
         });
 
         canvas.addEventListener(
             "pointermove",
             (e) => {
-                if (options.mainCanvas === false) e.stopPropagation();
-                if (this.drawState.frozen || !this.drawState.active || e.pointerId !== this.drawState.pointerID) return;
-                if (e.target && blockDrawingEvent(e.target as HTMLElement, options.mainCanvas ?? false)) return;
-                const localCoords = this._getLocalCoordsFromEvent(e);
-                const worldPoint = this._screenToWorld(localCoords.x, localCoords.y);
-
-                const last = this.drawState.pts[this.drawState.pts.length - 1];
-                if (Math.hypot(worldPoint.x - last[0], worldPoint.y - last[1]) < 1 / this._getZoom()) return;
-
-                this.drawState.pts.push([worldPoint.x, worldPoint.y]);
-
-                const tempRect = getQuadItem({
-                    id: "temp",
-                    x: 0,
-                    y: 0,
-                    width: 0,
-                    height: 0,
-                    data: {
-                        type: "stroke-rect",
-                        pts: this.drawState.pts,
-                        stroke: { width: this._getScaledStroke(this.drawState.width), color: this.drawState.color },
-                    },
-                });
-                this._drawStroke(this.drawState.g!, tempRect, this._getZoom());
+                this.canvasTool.pointerMove(e);
             },
             { passive: false }
         );
 
-        const finishStroke = () => {
-            if (this.drawState.g) {
-                this.world.removeChild(this.drawState.g);
-                this.strokeCache.delete("temp");
-                this.drawState.g = null;
-            }
-
-            if (this.drawState.frozen || !this.drawState.active || this.drawState.pts.length < 2) {
-                this.drawState.active = false;
-                return;
-            }
-
-            const data: StrokeData = {
-                type: "stroke-rect",
-                pts: this.drawState.pts,
-                stroke: { width: this._getScaledStroke(this.drawState.width), color: this.drawState.color },
-            };
-
-            // This is the key interaction: the view asks the model to add the stroke.
-            this.model.addStroke(data);
-
-            this.drawState.active = false;
-        };
+        const finishStroke = () => {};
 
         canvas.addEventListener("pointerup", (e) => {
-            if (e.pointerId === this.drawState.pointerID) finishStroke();
+            this.canvasTool.pointerUp(e);
         });
-        canvas.addEventListener("pointercancel", finishStroke);
+        canvas.addEventListener("pointercancel", (e) => {
+            this.canvasTool.pointerUp(e);
+        });
     }
 
-    private _getLocalCoordsFromEvent(event: { clientX: number; clientY: number }): { x: number; y: number } {
+    getLocalCoordsFromEvent(event: { clientX: number; clientY: number }): { x: number; y: number } {
         const rect = this.app.canvas.getBoundingClientRect();
         return {
             x: event.clientX - rect.left,
@@ -235,7 +176,7 @@ export class CanvasView {
             const viewRect = this._getViewRect();
 
             // Update background landmarks
-            updateFractalLandmarks(this.fractalCtx, viewRect, this._getZoom());
+            updateFractalLandmarks(this.fractalCtx, viewRect, this.getZoom());
 
             // Get only the strokes visible in this view's viewport from the shared model
             const visible = this.model.getVisibleItems(viewRect);
@@ -254,7 +195,7 @@ export class CanvasView {
                         this.strokeCache.set(item.id, g);
                         this.world.addChild(g);
                     }
-                    this._drawStroke(g, item, this._getZoom());
+                    this.drawStroke(g, item, this.getZoom());
                     g.visible = true;
                 }
             }
@@ -263,9 +204,13 @@ export class CanvasView {
 
     // --- Private Helpers (previously global functions) ---
 
-    private _getZoom = (): number => this.localScale * Math.pow(2, this.zoomExp);
+    getZoom(): number {
+        return this.localScale * Math.pow(2, this.zoomExp);
+    }
 
-    private _getScaledStroke = (strokeWidth: number): number => (strokeWidth / this.localScale) * Math.pow(2, -this.zoomExp);
+    getScaledStroke(strokeWidth: number): number {
+        return (strokeWidth / this.localScale) * Math.pow(2, -this.zoomExp);
+    }
 
     private _updateZoom = (delta: number): void => {
         const factor = delta < 0 ? 1.1 : 0.9;
@@ -281,13 +226,13 @@ export class CanvasView {
         }
     };
 
-    private _screenToWorld(x: number, y: number): { x: number; y: number } {
-        const inv = 1 / this._getZoom();
+    screenToWorld(x: number, y: number): { x: number; y: number } {
+        const inv = 1 / this.getZoom();
         return { x: (x - this.world.x) * inv, y: (y - this.world.y) * inv };
     }
 
     private _getViewRect(): BBox {
-        const z = this._getZoom();
+        const z = this.getZoom();
         return {
             x: -this.world.x / z,
             y: -this.world.y / z,
@@ -296,7 +241,7 @@ export class CanvasView {
         };
     }
 
-    private _drawStroke(g: Graphics & { lastZoom?: number }, rect: QuadItem<StrokeProperties>, z: number): void {
+    drawStroke(g: Graphics & { lastZoom?: number }, rect: QuadItem<StrokeProperties>, z: number): void {
         if (rect.id !== "temp" && g.lastZoom === z) return;
 
         const s = rect.data;

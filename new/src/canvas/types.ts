@@ -21,7 +21,7 @@ export interface StrokeData {
 }
 
 export type BBox = { x: number; y: number; width: number; height: number };
-export type Zoom = { zoomExp: -25; localScale: 1 };
+export type Zoom = { zoomExp: number; localScale: number };
 
 export interface QuadTreeItemProperties<Data extends Object> extends BBox {
     id: string;
@@ -77,3 +77,9 @@ export const getQuadItem = <P extends QuadItemProperties>(p: P) => {
 export const isStroke = (i: QuadItem): i is QuadItem<StrokeProperties> => i.data.type === "stroke-rect";
 export const isTextCard = (i: QuadItem): i is QuadItem<StrokeProperties> => i.data.type === "text-card";
 export const isWormholeCard = (i: QuadItem): i is QuadItem<StrokeProperties> => i.data.type === "wormhole-card";
+
+export interface CanvasTool {
+    pointerDown(e: PointerEvent): void;
+    pointerMove(e: PointerEvent): void;
+    pointerUp(e: PointerEvent): void;
+}
