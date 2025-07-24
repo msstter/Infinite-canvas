@@ -2,12 +2,11 @@
 import { DrawingModel } from "./DrawingData/DrawingModel";
 import { CanvasView } from "./canvas/CanvasView";
 import { initControlListeners } from "./controls";
-import { initNotecard } from "./Notecard/Notecard";
 import { initPalletButtons } from "./pallet/initPallet";
 
 function initApp() {
     const model = new DrawingModel();
-    initNotecard();
+
     const mainCanvasView = new CanvasView(document.body, model, { mainCanvas: true });
 
     initControlListeners(model, mainCanvasView);

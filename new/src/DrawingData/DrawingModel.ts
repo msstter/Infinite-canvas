@@ -64,17 +64,18 @@ export class DrawingModel {
      */
     public async init(): Promise<void> {
         try {
-            const allStrokes = await this.db.strokes.toArray();
-            for (const s of allStrokes) {
-                // The data from Dexie is a plain object, so we recreate the StrokeRect instance.
-                const rect = getQuadItem(s as StrokeProperties);
-                this.tree.insert(rect);
+            const [allStrokes, allCards] = await Promise.all([
+                this.db.strokes.toArray(),
+                this.db.textCards.toArray(), // NEW
+            ]);
+
+            for (const s of [...allStrokes, ...allCards]) {
+                this.tree.insert(getQuadItem(s as any)); // 'any' because this function is generic
             }
-            console.log(`DrawingModel: Initialized with ${allStrokes.length} strokes from DB.`);
-        } catch (error) {
-            console.error("DrawingModel: Failed to initialize from database.", error);
+            console.log(`DrawingModel: Initialized with ${allStrokes.length} strokes ` + `and ${allCards.length} text cards from DB.`);
+        } catch (err) {
+            console.error("DrawingModel: DB init failed", err);
         } finally {
-            // Signal that initialization is complete and trigger an initial render.
             this.store.getState().setInitialized(true);
             this.store.getState().incrementRevision();
         }
@@ -136,9 +137,9 @@ export class DrawingModel {
     /**
      * Private helper to save a stroke to the database, cleaning it first.
      */
-    private saveItemToDB(rect: QuadItem<StrokeProperties | TextCardProperties>): void {
+    private saveItemToDB(item: QuadItem<StrokeProperties | TextCardProperties>): void {
         // structuredClone creates a deep copy and removes methods/prototypes.
-        const clone = structuredClone(rect);
+        const clone = structuredClone(item);
         // The quadtree adds a private `qtIndex` property during insertion; we must remove it before saving.
 
         if (isStroke(clone)) {

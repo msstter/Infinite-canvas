@@ -1,68 +1,73 @@
-import { CanvasView } from "../canvas/CanvasView";
+/* canvas/NotecardOverlay.ts ---------------------------------------------- */
 import { QuadItem, TextCardProperties } from "../canvas/types";
-import { Notecard } from "./Notecard";
+import { CanvasView } from "../canvas/CanvasView";
+import { Notecard } from "../Notecard/Notecard";
 
-/* canvas/NotecardOverlay.ts ----------------------------------------------- */
 export class NotecardOverlay {
-    private host: HTMLElement; // <div> absolutely‑positioned over the canvas
-    private cards = new Map<string, HTMLElement>(); // id → DOM element
+    /** Absolutely‑positioned container that sits on top of one canvas */
+    private host: HTMLDivElement;
+    /** id → DOM element */
+    private cards = new Map<string, HTMLDivElement>();
+    /** Incremented every frame so we can GC unused cards */
+    private frame = 0;
 
     constructor(canvasEl: HTMLCanvasElement) {
-        // one overlay div per <canvas>; it sits in the same stacking context
         this.host = document.createElement("div");
         Object.assign(this.host.style, {
             position: "absolute",
-            inset: "0", // full size of the canvas
-            pointerEvents: "none", // events still reach the canvas
+            inset: "0",
+            pointerEvents: "none",
         });
         canvasEl.parentElement!.appendChild(this.host);
     }
 
-    /** Sync the DOM to the set of visible TextCard items */
-    sync(view: CanvasView, items: QuadItem<TextCardProperties>[]) {
+    /** Call once at the *beginning* of a render‑loop iteration */
+    beginFrame() {
+        this.frame++;
+    }
+
+    /** Feed *one* visible text‑card per call */
+    sync(view: CanvasView, rect: QuadItem<TextCardProperties>) {
+        const id = rect.id;
         const zView = view.getZoom();
-        const world = view["world"]; // for world.x / world.y
+        const zCard = Math.pow(2, rect.data.zoom.zoomExp) * rect.data.zoom.localScale;
+        const scale = zView / zCard;
 
-        // Mark everything unused first
-        for (const el of this.cards.values()) el.dataset.keep = "0";
+        // world‑units → screen‑px
+        const sx = rect.x * zView + view["world"].x;
+        const sy = rect.y * zView + view["world"].y;
+        const screenW = rect.width * zView;
 
-        for (const rect of items) {
-            const id = rect.id;
-            const { width: baseW, height: baseH } = rect; // == 508/z0, 304/z0
-            const zCard = Math.pow(2, rect.data.zoom.zoomExp) * rect.data.zoom.localScale;
-            const scale = zView / zCard;
-            const screenW = baseW * zView; // == 508 * scale
-            if (screenW < 50) {
-                // too small → skip render
-                const el = this.cards.get(id);
-                if (el) el.style.display = "none";
-                continue;
-            }
-
-            // Create if necessary
-            let el = this.cards.get(id);
-            if (!el) {
-                el = new Notecard(0, 0, 508, 304).getElement(); // fixed base size
-                el.style.position = "absolute";
-                el.style.transformOrigin = "top left";
-                el.style.pointerEvents = "auto"; // enable interaction
-                this.host.appendChild(el);
-                this.cards.set(id, el);
-            }
-            el.style.display = ""; // ensure visible
-            el.dataset.keep = "1";
-
-            // World → screen transform
-            const sx = rect.x * zView + world.x; // same math as PIXI does internally
-            const sy = rect.y * zView + world.y;
-
-            // GPU‑friendly translate+scale
-            el.style.transform = `translate(${sx}px,${sy}px) scale(${scale})`;
+        // Ignore if too small on screen
+        if (screenW < 50) {
+            const el = this.cards.get(id);
+            if (el) el.style.display = "none";
+            return;
         }
 
-        // Remove elements no longer in view
+        // Create DOM node lazily
+        let el = this.cards.get(id);
+        if (!el) {
+            el = new Notecard(0, 0, 508, 304).getElement();
+            Object.assign(el.style, {
+                position: "absolute",
+                transformOrigin: "top left",
+                pointerEvents: "auto",
+                willChange: "transform",
+            });
+            this.host.appendChild(el);
+            this.cards.set(id, el);
+        }
+        el.style.display = "";
+        el.dataset.frame = String(this.frame); // mark as kept this frame
+        el.style.transform = `translate(${sx}px,${sy}px) scale(${scale})`;
+    }
+
+    /** Call once *after* the for‑loop to clean up any cards not seen this frame */
+    endFrame() {
+        const current = String(this.frame);
         for (const [id, el] of this.cards) {
-            if (el.dataset.keep === "0") {
+            if (el.dataset.frame !== current) {
                 this.host.removeChild(el);
                 this.cards.delete(id);
             }

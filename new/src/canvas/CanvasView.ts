@@ -2,11 +2,12 @@
 import { Application, Container, Graphics, Rectangle, ApplicationOptions } from "pixi.js";
 import { DrawingModel } from "../DrawingData/DrawingModel";
 import { createFractalLandmarks, updateFractalLandmarks, FractalLandmarksContext } from "./fractalLandmarks";
-import { StrokeData, BBox, StrokeProperties, CanvasViewOptions, QuadItem, getQuadItem, isStroke, Zoom, CanvasTool } from "./types";
+import { StrokeData, BBox, StrokeProperties, CanvasViewOptions, QuadItem, getQuadItem, isStroke, Zoom, CanvasTool, isTextCard } from "./types";
 import { ActiveTool, appStore } from "../appState";
 import { TextCardTool } from "./canvasTools/TextCardTool";
 import { blockDrawingEvent, DrawTool } from "./canvasTools/DrawTool";
 import { getCanvasTool } from "./canvasTools/getCanvasTool";
+import { NotecardOverlay } from "../Notecard/notecardOverlay";
 
 type DrawState = {
     frozen: boolean;
@@ -56,6 +57,7 @@ export class CanvasView {
     private zoomExp: number = -25;
     private localScale: number = 1;
 
+    overlay: NotecardOverlay | null = null;
     // --- Interaction State ---
     // TODO: Maybe this should be made private in the future.
     drawState: DrawState;
@@ -103,6 +105,8 @@ export class CanvasView {
             (s) => s.activeTool,
             (tool) => getCanvasTool(this, tool) // Note that sub-canvases will have empty tools (no pointer events)
         );
+
+        this.overlay = new NotecardOverlay(this.app.canvas);
     }
 
     getZoomObj(): Zoom {
@@ -162,6 +166,7 @@ export class CanvasView {
     /** Starts the PIXI ticker for continuous rendering. */
     private _startRenderLoop(): void {
         this.app.ticker.add(() => {
+            this.overlay?.beginFrame();
             const viewRect = this._getViewRect();
 
             // Update background landmarks
@@ -186,8 +191,11 @@ export class CanvasView {
                     }
                     this.drawStroke(g, item, this.getZoom());
                     g.visible = true;
+                } else if (isTextCard(item) && this.overlay) {
+                    this.overlay.sync(this, item);
                 }
             }
+            this.overlay?.endFrame();
         });
     }
 

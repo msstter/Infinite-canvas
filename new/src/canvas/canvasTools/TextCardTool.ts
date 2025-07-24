@@ -1,7 +1,8 @@
-// canvas/TextCardTool.ts
+// canvas/canvasTools/TextCardTool.ts
 
 import { CanvasView } from "../CanvasView";
 import { CanvasTool, getQuadItem, TextCardProperties } from "../types";
+import { blockDrawingEvent } from "./DrawTool";
 
 export class TextCardTool implements CanvasTool {
     private view: CanvasView;
@@ -12,6 +13,12 @@ export class TextCardTool implements CanvasTool {
 
     pointerDown = (e: PointerEvent) => {
         if (e.button !== 0) return; // only main click
+        if (
+            blockDrawingEvent(e.target as HTMLElement, true) // buttons / .notecard / .sub‑canvas
+        ) {
+            return;
+        }
+
         const { x: sx, y: sy } = this.view.getLocalCoordsFromEvent(e);
         const { x, y } = this.view.screenToWorld(sx, sy);
 
