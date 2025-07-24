@@ -48,7 +48,7 @@ export class NotecardOverlay {
         // Create DOM node lazily
         let el = this.cards.get(id);
         if (!el) {
-            el = new Notecard(0, 0, 508, 304).getElement();
+            el = new Notecard(0, 0, 508, 304, id).getElement();
             Object.assign(el.style, {
                 position: "absolute",
                 transformOrigin: "top left",
