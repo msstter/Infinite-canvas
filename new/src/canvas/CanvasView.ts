@@ -106,7 +106,7 @@ export class CanvasView {
             (tool) => getCanvasTool(this, tool) // Note that sub-canvases will have empty tools (no pointer events)
         );
 
-        this.overlay = new NotecardOverlay(this.app.canvas);
+        this.overlay = new NotecardOverlay(this);
     }
 
     getZoomObj(): Zoom {
@@ -192,7 +192,7 @@ export class CanvasView {
                     this.drawStroke(g, item, this.getZoom());
                     g.visible = true;
                 } else if (isTextCard(item) && this.overlay) {
-                    this.overlay.sync(this, item);
+                    this.overlay.sync(item);
                 }
             }
             this.overlay?.endFrame();

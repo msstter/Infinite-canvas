@@ -1,23 +1,27 @@
 /* canvas/NotecardOverlay.ts ---------------------------------------------- */
 import { QuadItem, TextCardProperties } from "../canvas/types";
-import { CanvasView } from "../canvas/CanvasView";
+import type { CanvasView } from "../canvas/CanvasView";
 import { Notecard } from "../Notecard/Notecard";
 
 export class NotecardOverlay {
     /** Absolutely‑positioned container that sits on top of one canvas */
     private host: HTMLDivElement;
+    readonly view: CanvasView;
     /** id → DOM element */
     private cards = new Map<string, HTMLDivElement>();
     /** Incremented every frame so we can GC unused cards */
     private frame = 0;
 
-    constructor(canvasEl: HTMLCanvasElement) {
+    constructor(view: CanvasView) {
         this.host = document.createElement("div");
+        this.view = view;
         Object.assign(this.host.style, {
             position: "absolute",
             inset: "0",
             pointerEvents: "none",
         });
+        const canvasEl = view.app.canvas;
+
         canvasEl.parentElement!.appendChild(this.host);
     }
 
@@ -27,15 +31,15 @@ export class NotecardOverlay {
     }
 
     /** Feed *one* visible text‑card per call */
-    sync(view: CanvasView, rect: QuadItem<TextCardProperties>) {
+    sync(rect: QuadItem<TextCardProperties>) {
         const id = rect.id;
-        const zView = view.getZoom();
+        const zView = this.view.getZoom();
         const zCard = Math.pow(2, rect.data.zoom.zoomExp) * rect.data.zoom.localScale;
         const scale = zView / zCard;
 
         // world‑units → screen‑px
-        const sx = rect.x * zView + view["world"].x;
-        const sy = rect.y * zView + view["world"].y;
+        const sx = rect.x * zView + this.view["world"].x;
+        const sy = rect.y * zView + this.view["world"].y;
         const screenW = rect.width * zView;
 
         // Ignore if too small on screen

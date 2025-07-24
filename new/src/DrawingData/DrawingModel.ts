@@ -2,7 +2,7 @@
 import { Quadtree, Rectangle } from "@timohausmann/quadtree-ts";
 import { createStore, StoreApi } from "zustand/vanilla";
 import { subscribeWithSelector } from "zustand/middleware";
-import { StrokeData, BBox, StrokeProperties, QuadItem, getQuadItem, TextCardProperties, isStroke, isTextCard } from "../canvas/types";
+import { StrokeData, BBox, StrokeProperties, QuadItem, getQuadItem, TextCardProperties, isStroke, isTextCard, TextCardData } from "../canvas/types";
 import { DrawingDB } from "./DrawingDB";
 import { DrawingDataService } from "./DrawingDataService";
 
@@ -133,26 +133,67 @@ export class DrawingModel {
         const QT_BOUNDS: BBox = { x: -1e13, y: -1e13, width: 2e13, height: 2e13 };
         return new Quadtree<QuadItem>(QT_BOUNDS);
     }
+    public async getTextCardById(id: string): Promise<QuadItem<TextCardProperties> | undefined> {
+        // 1. Hit IndexedDB by primary key to get the last‑saved bbox
+        const saved = await this.db.textCards.get(id);
+        if (!saved) return undefined;
+
+        // 2. Look up that bbox in the quadtree
+        const hits = this.tree.retrieve(
+            new Rectangle(saved) // saved already has x, y, width, height
+        ) as QuadItem<TextCardProperties>[];
+
+        // 3. Filter for exact id (k is usually 1)
+        return hits.find((h) => h.id === id);
+    }
+
+    async updateTextCard(id: string, patch: Partial<TextCardData>, newBBox?: Partial<BBox>): Promise<void> {
+        const card = await this.getTextCardById(id);
+        if (!card) {
+            console.warn(`updateTextCard: no card with id ${id} found`);
+            return;
+        }
+
+        // mutate in place
+        Object.assign(card.data, patch);
+        if (newBBox) Object.assign(card, newBBox);
+
+        // 1️⃣  re‑index inside the quadtree
+        this.tree.update(card, true);
+
+        // 2️⃣  persist (put = upsert, so it overwrites the row with same PK)
+        await this.saveItemToDB(card);
+
+        // 3️⃣  notify views
+        this.store.getState().incrementRevision();
+    }
 
     /**
      * Private helper to save a stroke to the database, cleaning it first.
      */
-    private saveItemToDB(item: QuadItem<StrokeProperties | TextCardProperties>): void {
+    async saveItemToDB(item: QuadItem<StrokeProperties | TextCardProperties>): Promise<void> {
         // structuredClone creates a deep copy and removes methods/prototypes.
         const clone = structuredClone(item);
         // The quadtree adds a private `qtIndex` property during insertion; we must remove it before saving.
 
         if (isStroke(clone)) {
             const { qtIndex, ...rest } = clone;
-            this.db.strokes.put(rest);
+            await this.db.strokes.put(rest);
         } else if (isTextCard(clone)) {
             const { qtIndex, ...rest } = clone;
-            this.db.textCards.put(rest);
+            await this.db.textCards.put(rest);
         }
     }
     public addTextCard(rect: QuadItem<TextCardProperties>): void {
         this.tree.insert(rect);
         this.saveItemToDB(rect);
+        this.store.getState().incrementRevision();
+    }
+    async deleteTextCard(id: string): Promise<void> {
+        const card = await this.getTextCardById(id);
+        if (!card) return;
+        this.tree.remove(card);
+        await this.db.textCards.delete(card.id);
         this.store.getState().incrementRevision();
     }
 

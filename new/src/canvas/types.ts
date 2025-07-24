@@ -39,17 +39,9 @@ export type TextCardData = {
     type: "text-card";
     title: string;
     htmlString: string; // the text card content
-    fontFamily: string;
-    fontSize: number;
 };
 
 export type TextCardProperties = QuadTreeItemProperties<TextCardData>;
-
-// export type TextCardRect = Rectangle<TextCardData> & TextCardProperties;
-
-// const TextCardRect = (t: TextCardProperties): TextCardRect => {
-//     return Object.assign(new Rectangle<TextCardData>(t), { id: t.id }) as TextCardRect;
-// };
 
 export type WormholeCardData = {
     type: "wormhole-card";
@@ -60,12 +52,6 @@ export type WormholeCardData = {
 
 export type WormholeCardProperties = QuadTreeItemProperties<WormholeCardData>;
 
-// export type WormholeCardRect = Rectangle<WormholeCardData> & WormholeCardProperties;
-
-// const WormholdCardRect = (w: WormholeCardProperties): WormholeCardRect => {
-//     return Object.assign(new Rectangle<WormholeCardData>(w), { id: w.id }) as WormholeCardRect;
-// };
-
 export type QuadItemProperties = TextCardProperties | WormholeCardProperties | StrokeProperties;
 
 export type QuadItem<P extends QuadItemProperties = QuadItemProperties> = Rectangle<P["data"]> & P;
@@ -75,8 +61,9 @@ export const getQuadItem = <P extends QuadItemProperties>(p: P) => {
 };
 
 export const isStroke = (i: QuadItem): i is QuadItem<StrokeProperties> => i.data.type === "stroke-rect";
-export const isTextCard = (i: QuadItem): i is QuadItem<StrokeProperties> => i.data.type === "text-card";
-export const isWormholeCard = (i: QuadItem): i is QuadItem<StrokeProperties> => i.data.type === "wormhole-card";
+export const isTextCard = (i: QuadItem): i is QuadItem<TextCardProperties> => i.data.type === "text-card";
+
+export const isWormholeCard = (i: QuadItem): i is QuadItem<WormholeCardProperties> => i.data.type === "wormhole-card";
 
 export interface CanvasTool {
     pointerDown(e: PointerEvent): void;

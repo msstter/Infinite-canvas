@@ -38,8 +38,6 @@ export class TextCardTool implements CanvasTool {
                 zoom: this.view.getZoomObj(),
                 title: "New card",
                 htmlString: "",
-                fontFamily: "Inter",
-                fontSize: 16,
             },
         });
 
