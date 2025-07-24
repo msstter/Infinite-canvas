@@ -4,8 +4,9 @@ import { DrawingModel } from "../DrawingData/DrawingModel";
 import { createFractalLandmarks, updateFractalLandmarks, FractalLandmarksContext } from "./fractalLandmarks";
 import { StrokeData, BBox, StrokeProperties, CanvasViewOptions, QuadItem, getQuadItem, isStroke, Zoom, CanvasTool } from "./types";
 import { ActiveTool, appStore } from "../appState";
-import { TextCardTool } from "./TextCardTool";
-import { blockDrawingEvent, DrawTool } from "./DrawTool";
+import { TextCardTool } from "./canvasTools/TextCardTool";
+import { blockDrawingEvent, DrawTool } from "./canvasTools/DrawTool";
+import { getCanvasTool } from "./canvasTools/getCanvasTool";
 
 type DrawState = {
     frozen: boolean;
@@ -97,21 +98,13 @@ export class CanvasView {
         this._initListeners(options);
         this._startRenderLoop();
 
-        this.setActiveTool = this.setActiveTool.bind(this); // Bind method for callback
         // When activeTool appState is updated, set the tool active in every canvas. Note this means that different tools cannot be active in different canvases. For now that's the behaivior we want.
-        appStore.subscribe((s) => s.activeTool, this.setActiveTool);
+        appStore.subscribe(
+            (s) => s.activeTool,
+            (tool) => getCanvasTool(this, tool) // Note that sub-canvases will have empty tools (no pointer events)
+        );
     }
 
-    setActiveTool(tool: ActiveTool): void {
-        if (tool === "draw") {
-            this.canvasTool = new DrawTool(this);
-        } else if (tool === "notecard") {
-            this.canvasTool = new TextCardTool(this);
-        } else {
-            // For now we default to draw tool
-            this.canvasTool = new DrawTool(this);
-        }
-    }
     getZoomObj(): Zoom {
         return { zoomExp: this.zoomExp, localScale: this.localScale };
     }
@@ -141,8 +134,6 @@ export class CanvasView {
 
         canvas.addEventListener("pointerdown", (e) => {
             this.canvasTool.pointerDown(e);
-
-            // Move all these to DrawTool
         });
 
         canvas.addEventListener(
@@ -152,8 +143,6 @@ export class CanvasView {
             },
             { passive: false }
         );
-
-        const finishStroke = () => {};
 
         canvas.addEventListener("pointerup", (e) => {
             this.canvasTool.pointerUp(e);

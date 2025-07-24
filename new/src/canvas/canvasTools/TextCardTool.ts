@@ -1,6 +1,7 @@
-import { DrawingModel } from "../DrawingData/DrawingModel";
-import { CanvasView } from "./CanvasView";
-import { CanvasTool, getQuadItem, TextCardProperties } from "./types";
+// canvas/TextCardTool.ts
+
+import { CanvasView } from "../CanvasView";
+import { CanvasTool, getQuadItem, TextCardProperties } from "../types";
 
 export class TextCardTool implements CanvasTool {
     private view: CanvasView;

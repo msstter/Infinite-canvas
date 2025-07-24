@@ -1,4 +1,4 @@
-// notecard.ts
+// Notecard/Notecard.ts
 
 export class Notecard {
     private element: HTMLDivElement;

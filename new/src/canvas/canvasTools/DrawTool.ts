@@ -1,6 +1,6 @@
 import { Graphics } from "pixi.js";
-import { CanvasView } from "./CanvasView";
-import { CanvasTool, getQuadItem, StrokeData } from "./types";
+import { CanvasView } from "../CanvasView";
+import { CanvasTool, getQuadItem, StrokeData } from "../types";
 
 export const blockDrawingEvent = (target: HTMLElement, mainCanvas: boolean) => {
     // If the target is in a parent that is a button, notecard, or sub-canvas
