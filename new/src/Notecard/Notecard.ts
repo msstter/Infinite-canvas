@@ -5,11 +5,14 @@ export class Notecard {
     private topBar: HTMLDivElement;
     private titleSpan: HTMLSpanElement;
     private contentArea: HTMLDivElement; // Declared here
-    private deleteButton: HTMLButtonElement; 
+    private deleteButton: HTMLButtonElement;
+    id: string;
 
-    constructor(x: number, y: number, width: number = 300, height: number = 200, onDelete: (notecard: Notecard) => void = ()=> {}) {
+    constructor(x: number, y: number, width: number = 300, height: number = 200, id: string = crypto.randomUUID(), onDelete: (notecard: Notecard) => void = () => {}) {
+        this.id = id;
         this.element = document.createElement("div");
         this.element.classList.add("notecard");
+        this.element.setAttribute("data-id", id);
         this.element.style.left = `${x}px`;
         this.element.style.top = `${y}px`;
         this.element.style.width = `${width}px`;
@@ -65,7 +68,6 @@ export class Notecard {
         // The order here (title, controlsContainer, deleteButton) will be laid out by flexbox.
         // Inserting it before the delete button using insertBefore is precise.
         this.topBar.insertBefore(controlsContainer, this.deleteButton);
-
 
         // Font Family Selector
         const fontSelect = document.createElement("select");
