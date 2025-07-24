@@ -73,22 +73,15 @@ canvas {
 }
 
 .pallet li {
-    margin-bottom: 20px;
+    margin-bottom: 8px;
 }
 
 .pallet-btn {
     padding: 10px;
-
+    border: 2px solid #222;
 }
 
 .pallet-btn.selected {
-   background: #92e9e3;
+   background: #B0663E;
 
-}
-
-.nested-canvas {
-    position: absolute;
-    top: 200px;
-    right: 300px;
-    border: 3px solid red;
 }

@@ -39,7 +39,7 @@ const createDrawingModelStore = () => {
             putCard: (card: QuadItem<TextCardProperties>) =>
                 set((state) => {
                     state.incrementRevision();
-                    return { textCards: { ...state.textCards, card } };
+                    return { textCards: { ...state.textCards, [card.id]: card } };
                 }),
             deleteCard: (id: string) =>
                 set((state) => {

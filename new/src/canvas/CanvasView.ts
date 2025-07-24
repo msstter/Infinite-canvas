@@ -1,8 +1,8 @@
 // canvas/canvasView.ts
 import { Application, Container, Graphics, Rectangle, ApplicationOptions } from "pixi.js";
 import { DrawingModel } from "../DrawingData/DrawingModel";
-import { createFractalLandmarks, updateFractalLandmarks, FractalLandmarksContext } from "./fractalLandmarks";
-import { StrokeData, BBox, StrokeProperties, CanvasViewOptions, QuadItem, getQuadItem, isStroke, Zoom, CanvasTool, isTextCard } from "./types";
+import { createFractalLandmarks, updateFractalLandmarks, FractalLandmarksContext, centerFractal } from "./fractalLandmarks";
+import { StrokeData, BBox, StrokeProperties, CanvasViewOptions, QuadItem, getQuadItem, isStroke, Zoom, CanvasTool, isTextCard, colorPallet } from "./types";
 import { ActiveTool, appStore } from "../appState";
 import { TextCardTool } from "./canvasTools/TextCardTool";
 import { blockDrawingEvent, DrawTool } from "./canvasTools/DrawTool";
@@ -22,6 +22,7 @@ type DrawState = {
 const getPixiOptions = (targetElement: HTMLElement, options: Partial<CanvasViewOptions>) => {
     const pixiOptions: Partial<import("pixi.js").ApplicationOptions> = {
         antialias: true,
+        backgroundColor: colorPallet.peony,
     };
 
     if (options.mainCanvas) {
@@ -54,7 +55,7 @@ export class CanvasView {
     readonly fractalCtx: FractalLandmarksContext;
 
     // --- Private Camera State ---
-    private zoomExp: number = -25;
+    private zoomExp: number = -30;
     private localScale: number = 1;
 
     overlay: NotecardOverlay | null = null;
@@ -68,6 +69,7 @@ export class CanvasView {
         this.world = new Container();
         this.strokeCache = new Map();
         this.fractalCtx = createFractalLandmarks(12345); // optional seed
+
         this.canvasTool = new DrawTool(this);
         this.drawState = {
             frozen: false,
@@ -76,7 +78,7 @@ export class CanvasView {
             pts: [],
             g: null,
             width: 2,
-            color: 0x0088ff,
+            color: colorPallet.seafoam,
         };
 
         // This is an async constructor pattern. We run the async setup
@@ -95,7 +97,9 @@ export class CanvasView {
         this.app.stage.addChild(this.world);
         this.world.addChildAt(this.fractalCtx.container, 0); // background under strokes
         this.world.scale.set(this.getZoom());
-
+        this.world.x = this.app.renderer.width * 0.5;
+        this.world.y = this.app.renderer.height * 0.5;
+        // centerFractal(this.fractalCtx, this.app.renderer);
         this._initListeners(options);
         this.overlay = new NotecardOverlay(this);
         this.overlay.init();

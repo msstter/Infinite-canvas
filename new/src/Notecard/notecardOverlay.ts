@@ -3,7 +3,13 @@ import { BBox, isTextCard, QuadItem, TextCardData, TextCardProperties } from "..
 import type { CanvasView } from "../canvas/CanvasView";
 import { Notecard } from "../Notecard/Notecard";
 import { appStore } from "../appState";
-
+const debounce = (fn: () => void, ms = 400) => {
+    let t: number | undefined;
+    return () => {
+        clearTimeout(t);
+        t = window.setTimeout(fn, ms);
+    };
+};
 export class NotecardOverlay {
     /** Absolutely‑positioned container that sits on top of one canvas */
     private host: HTMLDivElement;
@@ -29,6 +35,7 @@ export class NotecardOverlay {
         this.updateTextCard = this.view.model.updateTextCard.bind(this.view.model);
         canvasEl.parentElement!.appendChild(this.host);
         this.subscribe(); // Subscribe to changes in text card data form model
+        this.initHandlers();
     }
 
     init() {
@@ -44,12 +51,43 @@ export class NotecardOverlay {
         }
     }
 
-    attachHandlers() {
-        for (const [id, note] of this.notecards) {
-            const content = note.getElement().querySelector(".notecard-content");
-            const title = note.getElement().querySelector(".notecard-title");
+    attachHandlers(note: Notecard) {
+        const { id } = note;
+        const root = note.getElement();
+
+        // ---- Title -----------------------------------------------------
+        const titleEl = root.querySelector<HTMLSpanElement>(".notecard-title");
+        if (titleEl && !titleEl.dataset.bound) {
+            titleEl.addEventListener("blur", () => {
+                this.updateTextCard(id, { title: titleEl.innerText.trim() });
+            });
+            titleEl.dataset.bound = "true";
+        }
+
+        // ---- Content ---------------------------------------------------
+        const contentEl = root.querySelector<HTMLDivElement>(".notecard-content");
+        if (contentEl && !contentEl.dataset.bound) {
+            // Commit on blur (guaranteed) …
+            contentEl.addEventListener("blur", () => {
+                this.updateTextCard(id, { htmlString: contentEl.innerHTML });
+            });
+            // …and on‑type with debounce for live sync
+            contentEl.addEventListener(
+                "input",
+                debounce(() => {
+                    this.updateTextCard(id, { htmlString: contentEl.innerHTML });
+                })
+            );
+            contentEl.dataset.bound = "true";
         }
     }
+    /** Attach input / blur listeners exactly once per Notecard */
+    initHandlers() {
+        for (const [id, note] of this.notecards) {
+            this.attachHandlers(note);
+        }
+    }
+
     /** Call once at the *beginning* of a render‑loop iteration */
     beginFrame() {
         this.frame++;
@@ -86,6 +124,7 @@ export class NotecardOverlay {
             });
             this.host.appendChild(note.getElement());
             this.notecards.set(id, note);
+            this.attachHandlers(note);
         }
         note.getElement().style.display = "";
         note.getElement().dataset.frame = String(this.frame); // mark as kept this frame

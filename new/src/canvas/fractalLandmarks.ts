@@ -1,6 +1,7 @@
 // fractalLandmarks.ts
-import type { BBox } from "./types";
-import { Container, Graphics } from "pixi.js";
+
+import { colorPallet, type BBox } from "./types";
+import { Container, Graphics, Renderer } from "pixi.js";
 
 /**
  * Public context you keep and pass to update.
@@ -53,7 +54,7 @@ const MAX_PLACEMENT_ATTEMPTS = 50;
  */
 export function createFractalLandmarks(seed = 1): FractalLandmarksContext {
     const fullConfig: FractalConfig = {
-        rootCount: 5,
+        rootCount: 1,
         rootRadiusRange: [8e10, 16e10],
         childRadiusFrac: [0.15, 0.2],
         childCountRange: [5, 7],
@@ -192,11 +193,8 @@ export function updateFractalLandmarks(ctx: FractalLandmarksContext, viewRect: B
 /* Generation helpers                                  */
 /* -------------------------------------------------- */
 
-// const COLOR_EVEN = 0x0f2e1b; // green
-// const COLOR_EVEN = 0x04150c; // green
-// const COLOR_EVEN = 0x1b180c;
-const COLOR_EVEN = 0x1a1b0c;
-const COLOR_ODD = 0x000000; // black
+const COLOR_EVEN = colorPallet.squall;
+const COLOR_ODD = colorPallet.peony;
 
 function generateChildren(parent: BlobNode, ctx: FractalLandmarksContext) {
     const { config, seed, nodes } = ctx;
@@ -358,4 +356,13 @@ function randInt(rng: () => number, min: number, max: number) {
 
 function intersects(a: BBox, b: BBox) {
     return !(a.x + a.width < b.x || a.x > b.x + b.width || a.y + a.height < b.y || a.y > b.y + b.height);
+}
+
+export function centerFractal(
+    ctx: FractalLandmarksContext,
+    renderer: Renderer // or app.renderer / app.screen
+) {
+    const cx = renderer.width * 0.5;
+    const cy = renderer.height * 0.5;
+    ctx.container.position.set(cx, cy);
 }

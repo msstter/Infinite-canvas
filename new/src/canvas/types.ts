@@ -70,3 +70,10 @@ export interface CanvasTool {
     pointerMove(e: PointerEvent): void;
     pointerUp(e: PointerEvent): void;
 }
+
+export const colorPallet = {
+    seafoam: 0x30535c,
+    driftwood: 0xc1754d,
+    peony: 0xf5e7de,
+    squall: 0x9eb1af,
+};
